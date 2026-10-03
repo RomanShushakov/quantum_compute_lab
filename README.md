@@ -360,6 +360,94 @@ classical counts
 This provides the physical-QPU baseline for the next simulator-versus-QPU
 experiment.
 
+
+### 04 - Simulator vs QPU
+
+Compare the same Bell-state circuit using an ideal local simulator and a
+physical IBM Quantum processor.
+
+The exact theoretical Bell-state distribution is:
+
+``` text
+P(00) = 0.5
+P(01) = 0.0
+P(10) = 0.0
+P(11) = 0.5
+```
+
+The experiment executes the circuit with 1000 shots on both Qiskit Aer
+and the selected physical QPU, converts the resulting counts to
+probabilities, and compares the distributions.
+
+One run produced:
+
+``` text
+Ideal simulator:
+{'11': 509, '00': 491}
+
+Physical QPU:
+{'00': 481, '11': 457, '01': 27, '10': 35}
+```
+
+The corresponding probabilities were:
+
+``` text
+State  Simulator  QPU
+   00      0.491  0.481
+   01      0.000  0.027
+   10      0.000  0.035
+   11      0.509  0.457
+```
+
+The ideal simulator differs slightly from the exact `0.5 / 0.5`
+distribution because a finite number of shots samples the theoretical
+probability distribution. It still produces no `01` or `10` outcomes.
+
+The physical QPU produced `01` and `10` in 6.2% of the measurements:
+
+``` text
+P(01) + P(10) = 0.027 + 0.035 = 0.062
+```
+
+To compare complete distributions quantitatively, the experiment uses
+total variation distance:
+
+``` text
+D_TV(P, Q) = 1/2 * sum_x |P(x) - Q(x)|
+```
+
+For the observed run:
+
+``` text
+Simulator vs theory: 0.009
+QPU vs theory:       0.062
+Simulator vs QPU:    0.062
+```
+
+The simulator-versus-theory distance represents finite-shot sampling
+variation in an ideal simulation. The QPU-versus-theory result contains
+both finite-shot sampling variation and physical hardware effects.
+
+These distances cannot simply be subtracted to obtain a hardware error
+rate. They compare complete probability distributions, and a single
+finite-shot QPU sample does not isolate individual physical error
+sources.
+
+``` text
+exact theoretical distribution
+        |
+        +--> ideal simulator sample
+        |        |
+        |        `--> sampling variation
+        |
+        `--> physical QPU sample
+                 |
+                 `--> sampling variation + physical effects
+```
+
+The next experiment investigates the physical effects collectively
+described as quantum hardware noise.
+
 ## Linear algebra reference
 
 A compact LaTeX reference is kept in:
@@ -384,6 +472,8 @@ quantum_compute_lab/
     02_bell_state/
       main.py
     03_first_qpu/
+      main.py
+    04_simulator_vs_qpu/
       main.py
   README.md
   commands.md

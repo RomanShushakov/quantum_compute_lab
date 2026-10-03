@@ -78,13 +78,6 @@ python experiments/01_first_qubit/main.py
 
 ## Experiment 02 - Bell state
 
-Create the experiment directory:
-
-``` bash
-mkdir -p experiments/02_bell_state
-touch experiments/02_bell_state/main.py
-```
-
 Run the Bell-state experiment:
 
 ``` bash
@@ -103,12 +96,6 @@ python experiments/02_bell_state/main.py
 ```
 
 ## Documentation
-
-Create the documentation directory:
-
-``` bash
-mkdir -p docs
-```
 
 The linear-algebra reference is stored at:
 
@@ -145,13 +132,6 @@ QiskitRuntimeService.save_account(
 
 Do not store the real API key or instance CRN in the repository.
 
-Create the experiment directory:
-
-``` bash
-mkdir -p experiments/03_first_qpu
-touch experiments/03_first_qpu/main.py
-```
-
 Run the physical-QPU experiment:
 
 ``` bash
@@ -161,3 +141,16 @@ python experiments/03_first_qpu/main.py
 The same command was used while inspecting the selected backend,
 transpiling the Bell circuit for its ISA, and submitting the final
 1000-shot physical-QPU runs.
+
+## Experiment 04 - Simulator vs QPU
+
+Run the simulator-versus-QPU experiment:
+
+``` bash
+python experiments/04_simulator_vs_qpu/main.py
+```
+
+The same command was used while first establishing the ideal Aer
+baseline, then adding physical-QPU execution, and finally comparing the
+sampled distributions with the exact Bell-state distribution using total
+variation distance.
