@@ -115,3 +115,49 @@ The linear-algebra reference is stored at:
 ``` text
 docs/quantum_linear_algebra_reference.tex
 ```
+
+## Experiment 03 - First QPU
+
+Install the IBM Qiskit Runtime client:
+
+``` bash
+pip install qiskit-ibm-runtime
+pip freeze > requirements.txt
+```
+
+Save the IBM Quantum credentials locally from an interactive Python
+session:
+
+``` bash
+python
+```
+
+```python
+from qiskit_ibm_runtime import QiskitRuntimeService
+
+QiskitRuntimeService.save_account(
+    token="YOUR_API_KEY",
+    instance="YOUR_INSTANCE_CRN",
+    set_as_default=True,
+    overwrite=True,
+)
+```
+
+Do not store the real API key or instance CRN in the repository.
+
+Create the experiment directory:
+
+``` bash
+mkdir -p experiments/03_first_qpu
+touch experiments/03_first_qpu/main.py
+```
+
+Run the physical-QPU experiment:
+
+``` bash
+python experiments/03_first_qpu/main.py
+```
+
+The same command was used while inspecting the selected backend,
+transpiling the Bell circuit for its ISA, and submitting the final
+1000-shot physical-QPU runs.

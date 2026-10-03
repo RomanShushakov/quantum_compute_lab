@@ -135,7 +135,7 @@ representation.
 
 The canonical circuit is:
 
-```text
+``` text
 q0: |0> -> H -> * -> measure
                 |
 q1: |0> ------> X -> measure
@@ -145,19 +145,19 @@ q1: |0> ------> X -> measure
 
 The resulting Bell state is:
 
-```text
+``` text
 (|00> + |11>) / sqrt(2)
 ```
 
 In state-vector form:
 
-```text
+``` text
 1/sqrt(2) * [1, 0, 0, 1]^T
 ```
 
 The ideal measurement probabilities are:
 
-```text
+``` text
 P(00) = 0.5
 P(01) = 0.0
 P(10) = 0.0
@@ -166,7 +166,7 @@ P(11) = 0.5
 
 Typical 1000-shot results were:
 
-```text
+``` text
 {'11': 475, '00': 525}
 {'11': 517, '00': 483}
 ```
@@ -174,7 +174,7 @@ Typical 1000-shot results were:
 As a comparison, two independent Hadamard qubits produced all four
 outcomes with approximately equal probability:
 
-```text
+``` text
 00 ~ 25%
 01 ~ 25%
 10 ~ 25%
@@ -187,13 +187,13 @@ makes the state entangled.
 
 A `Z` gate was also used to change the Bell state from:
 
-```text
+``` text
 (|00> + |11>) / sqrt(2)
 ```
 
 to:
 
-```text
+``` text
 (|00> - |11>) / sqrt(2)
 ```
 
@@ -204,32 +204,32 @@ magnitudes of the amplitudes.
 Decoding the Bell state with `CNOT` followed by `H` made the phase
 observable through interference. With `Z`, the result was:
 
-```text
+``` text
 {'01': 1000}
 ```
 
 Without `Z`, the result was:
 
-```text
+``` text
 {'00': 1000}
 ```
 
 The simulator was also used to inspect the state vector directly. The
 Bell state produced approximately:
 
-```text
+``` text
 [0.70710678, 0, 0, 0.70710678]
 ```
 
 and after the `Z` phase flip:
 
-```text
+``` text
 [0.70710678, 0, 0, -0.70710678]
 ```
 
 This connects the linear-algebra representation to measurement:
 
-```text
+``` text
 state vector
     |
     v
@@ -247,11 +247,124 @@ counts
 For `n` qubits there are `2^n` computational-basis states and therefore
 `2^n` amplitudes in the state vector.
 
+
+### 03 - First QPU
+
+Run the Bell-state circuit from Experiment 02 on a physical IBM Quantum
+processor.
+
+The Runtime service reported `ibm_fez`, `ibm_kingston`, and
+`ibm_marrakesh` as available backends. Selecting the least-busy
+operational backend with at least two qubits selected:
+
+``` text
+Backend: ibm_fez
+Qubits: 156
+```
+
+The logical Bell circuit uses `H` followed by `CX`. Before execution on
+the physical QPU, Qiskit transpiles it for the selected backend.
+
+For the observed transpilation, the logical operations:
+
+``` text
+measure: 2
+h:       1
+cx:      1
+```
+
+became an ISA circuit containing:
+
+``` text
+rz:      6
+sx:      3
+measure: 2
+cz:      1
+```
+
+This demonstrates the hardware compilation step:
+
+``` text
+logical circuit
+H + CX
+    |
+    v
+transpilation for ibm_fez
+    |
+    v
+QPU-native ISA circuit
+Rz + SX + CZ
+```
+
+The transpiler mapped the two logical qubits to physical qubits 0 and 1
+for the observed run.
+
+The transpiled circuit was submitted with 1000 shots using the IBM
+Runtime Sampler. One physical-QPU run returned:
+
+``` text
+{'00': 481, '10': 32, '11': 457, '01': 30}
+```
+
+A second run returned:
+
+``` text
+{'00': 483, '11': 450, '01': 26, '10': 41}
+```
+
+For the second run:
+
+``` text
+P(00) = 0.483
+P(11) = 0.450
+P(01) = 0.026
+P(10) = 0.041
+```
+
+The ideal Bell outcomes accounted for `0.933` of the measurements, while
+`01` and `10`, which are absent from the ideal Bell-state distribution,
+accounted for `0.067`.
+
+The ideal simulator predicts only `00` and `11`, while the physical QPU
+also produced `01` and `10`. More shots improve the statistical estimate
+of the physical output distribution, but do not by themselves remove
+hardware noise or physical errors.
+
+The complete execution path is:
+
+``` text
+Bell-state mathematics
+    |
+    v
+logical Qiskit circuit
+    |
+    v
+transpilation for ibm_fez
+    |
+    v
+hardware-specific ISA circuit
+    |
+    v
+IBM Runtime Sampler
+    |
+    v
+physical QPU
+    |
+    v
+1000 measurements
+    |
+    v
+classical counts
+```
+
+This provides the physical-QPU baseline for the next simulator-versus-QPU
+experiment.
+
 ## Linear algebra reference
 
 A compact LaTeX reference is kept in:
 
-```text
+``` text
 docs/quantum_linear_algebra_reference.tex
 ```
 
@@ -261,7 +374,7 @@ products, matrix-matrix products, and the Bell-state representation.
 
 ## Repository structure
 
-```text
+``` text
 quantum_compute_lab/
   docs/
     quantum_linear_algebra_reference.tex
@@ -269,6 +382,8 @@ quantum_compute_lab/
     01_first_qubit/
       main.py
     02_bell_state/
+      main.py
+    03_first_qpu/
       main.py
   README.md
   commands.md
