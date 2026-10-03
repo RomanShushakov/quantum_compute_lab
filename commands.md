@@ -50,14 +50,6 @@ Verify the Qiskit installation:
 python -c "import qiskit; print(qiskit.__version__)"
 ```
 
-## Experiment 01 - First qubit
-
-Run the first-qubit experiment:
-
-``` bash
-python experiments/01_first_qubit/main.py
-```
-
 Install the Qiskit Aer simulator:
 
 ``` bash
@@ -70,8 +62,56 @@ Update the saved Python dependencies:
 pip freeze > requirements.txt
 ```
 
-Run the experiment again using the local simulator:
+For an existing checkout, install the saved dependencies with:
+
+``` bash
+pip install -r requirements.txt
+```
+
+## Experiment 01 - First qubit
+
+Run the first-qubit experiment:
 
 ``` bash
 python experiments/01_first_qubit/main.py
+```
+
+## Experiment 02 - Bell state
+
+Create the experiment directory:
+
+``` bash
+mkdir -p experiments/02_bell_state
+touch experiments/02_bell_state/main.py
+```
+
+Run the Bell-state experiment:
+
+``` bash
+python experiments/02_bell_state/main.py
+```
+
+The same command was used while testing the experiment variants,
+including the independent-Hadamard comparison, the `Z` phase flip,
+Bell-state decoding, and state-vector inspection.
+
+After returning `main.py` to the canonical Bell-state circuit, run it
+again with:
+
+``` bash
+python experiments/02_bell_state/main.py
+```
+
+## Documentation
+
+Create the documentation directory:
+
+``` bash
+mkdir -p docs
+```
+
+The linear-algebra reference is stored at:
+
+``` text
+docs/quantum_linear_algebra_reference.tex
 ```

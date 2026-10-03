@@ -1,0 +1,573 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=18mm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage[hidelinks]{hyperref}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.65em}
+
+\newcommand{\ket}[1]{\left|#1\right\rangle}
+\newcommand{\bra}[1]{\left\langle#1\right|}
+\newcommand{\braket}[2]{\left\langle #1 \middle| #2 \right\rangle}
+
+\title{\textbf{Quantum Computing Linear Algebra - Quick Reference}}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+\vspace{-1.5em}
+
+This reference keeps the ordinary linear-algebra representation next to the
+quantum notation. The main question to ask is: \emph{what objects are being
+combined, and what kind of object should the operation produce?}
+
+\section{Column vectors, row vectors, transpose, and adjoint}
+
+A state vector is normally represented as a \textbf{column vector}:
+
+\[
+a =
+\begin{bmatrix}
+a_0\\
+a_1
+\end{bmatrix},
+\qquad
+\text{shape } 2\times1.
+\]
+
+Its ordinary transpose is a \textbf{row vector}:
+
+\[
+a^T =
+\begin{bmatrix}
+a_0 & a_1
+\end{bmatrix},
+\qquad
+\text{shape } 1\times2.
+\]
+
+Quantum states may contain complex numbers. Therefore quantum notation normally
+uses the \textbf{conjugate transpose} (also called the Hermitian adjoint):
+
+\[
+a^\dagger =
+\begin{bmatrix}
+a_0^* & a_1^*
+\end{bmatrix}.
+\]
+
+Here $^*$ means complex conjugation. If all entries are real, then
+$a^\dagger=a^T$.
+
+In Dirac notation:
+
+\[
+\ket{a}
+\quad\longleftrightarrow\quad
+\begin{bmatrix}
+a_0\\a_1
+\end{bmatrix},
+\qquad
+\bra{a}
+\quad\longleftrightarrow\quad
+\begin{bmatrix}
+a_0^* & a_1^*
+\end{bmatrix}.
+\]
+
+\section{Inner product}
+
+\textbf{Input:} row vector $\times$ column vector
+
+\textbf{Output:} scalar
+
+\textbf{Quantum notation:}
+\[
+\braket{a}{b}.
+\]
+
+For example,
+
+\[
+\ket{a} =
+\begin{bmatrix}
+1\\0
+\end{bmatrix},
+\qquad
+\ket{b} =
+\frac{1}{\sqrt{2}}
+\begin{bmatrix}
+1\\1
+\end{bmatrix}.
+\]
+
+Then
+
+\[
+\braket{a}{b}
+=
+\begin{bmatrix}
+1 & 0
+\end{bmatrix}
+\frac{1}{\sqrt{2}}
+\begin{bmatrix}
+1\\1
+\end{bmatrix}
+=
+\frac{1}{\sqrt{2}}
+(1\cdot1+0\cdot1)
+=
+\frac{1}{\sqrt{2}}.
+\]
+
+The corresponding squared magnitude is
+
+\[
+\left|\braket{a}{b}\right|^2
+=
+\left|\frac{1}{\sqrt{2}}\right|^2
+=
+\frac{1}{2}.
+\]
+
+\textbf{Quantum use:} state overlap and measurement probabilities.
+
+\section{Outer product}
+
+\textbf{Input:} column vector $\times$ row vector
+
+\textbf{Output:} matrix
+
+For
+
+\[
+a =
+\begin{bmatrix}
+a_0\\a_1
+\end{bmatrix},
+\qquad
+b =
+\begin{bmatrix}
+b_0\\b_1
+\end{bmatrix},
+\]
+
+the real-valued outer product is
+
+\[
+ab^T
+=
+\begin{bmatrix}
+a_0\\a_1
+\end{bmatrix}
+\begin{bmatrix}
+b_0 & b_1
+\end{bmatrix}
+=
+\begin{bmatrix}
+a_0b_0 & a_0b_1\\
+a_1b_0 & a_1b_1
+\end{bmatrix}.
+\]
+
+In quantum notation we normally use the bra, so
+
+\[
+\ket{a}\bra{b}
+\]
+
+uses the conjugate transpose of $b$.
+
+A simple example is
+
+\[
+\ket{0}\bra{0}
+=
+\begin{bmatrix}
+1\\0
+\end{bmatrix}
+\begin{bmatrix}
+1 & 0
+\end{bmatrix}
+=
+\begin{bmatrix}
+1 & 0\\
+0 & 0
+\end{bmatrix}.
+\]
+
+\textbf{Quantum use:} projectors and density matrices. For a pure state,
+
+\[
+\rho = \ket{\psi}\bra{\psi}.
+\]
+
+\section{Kronecker / tensor product}
+
+\textbf{Input:} state vector $\otimes$ state vector
+
+\textbf{Output:} larger state vector
+
+For
+
+\[
+a =
+\begin{bmatrix}
+a_0\\a_1
+\end{bmatrix},
+\qquad
+b =
+\begin{bmatrix}
+b_0\\b_1
+\end{bmatrix},
+\]
+
+the Kronecker product is
+
+\[
+a\otimes b
+=
+\begin{bmatrix}
+a_0 b\\
+a_1 b
+\end{bmatrix}
+=
+\begin{bmatrix}
+a_0b_0\\
+a_0b_1\\
+a_1b_0\\
+a_1b_1
+\end{bmatrix}.
+\]
+
+For example,
+
+\[
+\ket{0}\otimes\ket{1}
+=
+\begin{bmatrix}
+1\\0
+\end{bmatrix}
+\otimes
+\begin{bmatrix}
+0\\1
+\end{bmatrix}
+=
+\begin{bmatrix}
+1\cdot0\\
+1\cdot1\\
+0\cdot0\\
+0\cdot1
+\end{bmatrix}
+=
+\begin{bmatrix}
+0\\1\\0\\0
+\end{bmatrix}
+=
+\ket{01}.
+\]
+
+For two qubits, the computational basis is
+
+\[
+\ket{00}=
+\begin{bmatrix}1\\0\\0\\0\end{bmatrix},
+\quad
+\ket{01}=
+\begin{bmatrix}0\\1\\0\\0\end{bmatrix},
+\quad
+\ket{10}=
+\begin{bmatrix}0\\0\\1\\0\end{bmatrix},
+\quad
+\ket{11}=
+\begin{bmatrix}0\\0\\0\\1\end{bmatrix}.
+\]
+
+Dimension growth is
+
+\[
+2\otimes2=4,
+\qquad
+2\otimes2\otimes2=8,
+\qquad
+n\text{ qubits}\longrightarrow2^n\text{ amplitudes}.
+\]
+
+\textbf{Key distinction:} the outer product produces a matrix; the Kronecker
+product composes systems into a larger state vector.
+
+\section{Matrix-vector product}
+
+\textbf{Input:} operator matrix $\times$ state vector
+
+\textbf{Output:} new state vector
+
+\textbf{Quantum notation:}
+\[
+U\ket{\psi}.
+\]
+
+Consider the Hadamard gate:
+
+\[
+H=
+\frac{1}{\sqrt{2}}
+\begin{bmatrix}
+1 & 1\\
+1 & -1
+\end{bmatrix},
+\qquad
+\ket{0}=
+\begin{bmatrix}
+1\\0
+\end{bmatrix}.
+\]
+
+Apply the matrix to the vector:
+
+\[
+H\ket{0}
+=
+\frac{1}{\sqrt{2}}
+\begin{bmatrix}
+1 & 1\\
+1 & -1
+\end{bmatrix}
+\begin{bmatrix}
+1\\0
+\end{bmatrix}.
+\]
+
+Calculate each output row:
+
+\[
+=
+\frac{1}{\sqrt{2}}
+\begin{bmatrix}
+1\cdot1+1\cdot0\\
+1\cdot1+(-1)\cdot0
+\end{bmatrix}
+=
+\frac{1}{\sqrt{2}}
+\begin{bmatrix}
+1\\1
+\end{bmatrix}.
+\]
+
+Using the basis vectors,
+
+\[
+\frac{1}{\sqrt{2}}
+\begin{bmatrix}
+1\\1
+\end{bmatrix}
+=
+\frac{1}{\sqrt{2}}
+\left(
+\begin{bmatrix}
+1\\0
+\end{bmatrix}
++
+\begin{bmatrix}
+0\\1
+\end{bmatrix}
+\right)
+=
+\frac{\ket{0}+\ket{1}}{\sqrt{2}}.
+\]
+
+So the familiar circuit operation
+
+\[
+\ket{0}\xrightarrow{H}
+\frac{\ket{0}+\ket{1}}{\sqrt{2}}
+\]
+
+is ordinary matrix-vector multiplication.
+
+\section{Matrix-matrix product}
+
+\textbf{Input:} operator matrix $\times$ operator matrix
+
+\textbf{Output:} composed operator matrix
+
+If $U_1$ acts first and $U_2$ acts second,
+
+\[
+\ket{\psi_1}=U_1\ket{\psi},
+\]
+
+\[
+\ket{\psi_2}=U_2\ket{\psi_1}
+            =U_2U_1\ket{\psi}.
+\]
+
+The \textbf{rightmost operator acts first}.
+
+Our first experiment used the fact that
+
+\[
+H^2=HH=I.
+\]
+
+Start with
+
+\[
+HH
+=
+\left(
+\frac{1}{\sqrt{2}}
+\begin{bmatrix}
+1 & 1\\
+1 & -1
+\end{bmatrix}
+\right)
+\left(
+\frac{1}{\sqrt{2}}
+\begin{bmatrix}
+1 & 1\\
+1 & -1
+\end{bmatrix}
+\right).
+\]
+
+Combine the scalar factors:
+
+\[
+=
+\frac{1}{2}
+\begin{bmatrix}
+1 & 1\\
+1 & -1
+\end{bmatrix}
+\begin{bmatrix}
+1 & 1\\
+1 & -1
+\end{bmatrix}.
+\]
+
+Calculate each matrix entry as row $\cdot$ column:
+
+\[
+=
+\frac{1}{2}
+\begin{bmatrix}
+1\cdot1+1\cdot1 &
+1\cdot1+1\cdot(-1)
+\\[4pt]
+1\cdot1+(-1)\cdot1 &
+1\cdot1+(-1)\cdot(-1)
+\end{bmatrix}.
+\]
+
+Therefore,
+
+\[
+=
+\frac{1}{2}
+\begin{bmatrix}
+2 & 0\\
+0 & 2
+\end{bmatrix}
+=
+\begin{bmatrix}
+1 & 0\\
+0 & 1
+\end{bmatrix}
+=
+I.
+\]
+
+Applying this composed operator to $\ket{0}$ gives
+
+\[
+HH\ket{0}
+=
+I\ket{0}
+=
+\ket{0},
+\]
+
+which is exactly what we observed experimentally with 1000 measurements of
+\texttt{0}.
+
+\section{Bell-state connection}
+
+The Bell state from the current lab is
+
+\[
+\ket{\Phi^+}
+=
+\frac{\ket{00}+\ket{11}}{\sqrt{2}}.
+\]
+
+Using the computational basis,
+
+\[
+=
+\frac{1}{\sqrt{2}}
+\left(
+\begin{bmatrix}
+1\\0\\0\\0
+\end{bmatrix}
++
+\begin{bmatrix}
+0\\0\\0\\1
+\end{bmatrix}
+\right)
+=
+\frac{1}{\sqrt{2}}
+\begin{bmatrix}
+1\\0\\0\\1
+\end{bmatrix}.
+\]
+
+After applying $Z$ to the appropriate qubit, our simulator showed
+
+\[
+\ket{\Phi^-}
+=
+\frac{\ket{00}-\ket{11}}{\sqrt{2}}
+=
+\frac{1}{\sqrt{2}}
+\begin{bmatrix}
+1\\0\\0\\-1
+\end{bmatrix}.
+\]
+
+The signs differ, but direct computational-basis measurement still gives
+
+\[
+P(00)=\frac{1}{2},
+\qquad
+P(11)=\frac{1}{2}.
+\]
+
+The relative phase becomes observable after further gate operations create
+interference.
+
+\section{At-a-glance summary}
+
+\begin{center}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Operation & Typical notation & Result & Quantum role\\
+\midrule
+Inner product & $\braket{a}{b}$ & scalar & overlap / probability\\
+Outer product & $\ket{a}\bra{b}$ & matrix & projector / density matrix\\
+Kronecker product & $\ket{a}\otimes\ket{b}$ & larger vector & combine systems\\
+Matrix-vector & $U\ket{\psi}$ & vector & apply gate\\
+Matrix-matrix & $U_2U_1$ & matrix & compose gates\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\end{document}

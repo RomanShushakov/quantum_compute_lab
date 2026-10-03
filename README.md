@@ -127,12 +127,148 @@ evolution and measurement. While coherence is preserved, quantum
 amplitudes can interfere. An intermediate measurement changes that
 evolution.
 
+### 02 - Bell state
+
+Create a two-qubit Bell state and use it to explore multi-qubit state
+spaces, correlation, entanglement, phase, interference, and state-vector
+representation.
+
+The canonical circuit is:
+
+```text
+q0: |0> -> H -> * -> measure
+                |
+q1: |0> ------> X -> measure
+
+               CNOT
+```
+
+The resulting Bell state is:
+
+```text
+(|00> + |11>) / sqrt(2)
+```
+
+In state-vector form:
+
+```text
+1/sqrt(2) * [1, 0, 0, 1]^T
+```
+
+The ideal measurement probabilities are:
+
+```text
+P(00) = 0.5
+P(01) = 0.0
+P(10) = 0.0
+P(11) = 0.5
+```
+
+Typical 1000-shot results were:
+
+```text
+{'11': 475, '00': 525}
+{'11': 517, '00': 483}
+```
+
+As a comparison, two independent Hadamard qubits produced all four
+outcomes with approximately equal probability:
+
+```text
+00 ~ 25%
+01 ~ 25%
+10 ~ 25%
+11 ~ 25%
+```
+
+The Bell state cannot be factored into a Kronecker product of two valid
+individual qubit state vectors. This is the linear-algebra property that
+makes the state entangled.
+
+A `Z` gate was also used to change the Bell state from:
+
+```text
+(|00> + |11>) / sqrt(2)
+```
+
+to:
+
+```text
+(|00> - |11>) / sqrt(2)
+```
+
+Direct measurement still produced approximately `00` and `11` with
+equal probability because the phase change does not change the squared
+magnitudes of the amplitudes.
+
+Decoding the Bell state with `CNOT` followed by `H` made the phase
+observable through interference. With `Z`, the result was:
+
+```text
+{'01': 1000}
+```
+
+Without `Z`, the result was:
+
+```text
+{'00': 1000}
+```
+
+The simulator was also used to inspect the state vector directly. The
+Bell state produced approximately:
+
+```text
+[0.70710678, 0, 0, 0.70710678]
+```
+
+and after the `Z` phase flip:
+
+```text
+[0.70710678, 0, 0, -0.70710678]
+```
+
+This connects the linear-algebra representation to measurement:
+
+```text
+state vector
+    |
+    v
+complex probability amplitudes
+    |
+    | magnitude squared
+    v
+measurement probabilities
+    |
+    | repeated sampling
+    v
+counts
+```
+
+For `n` qubits there are `2^n` computational-basis states and therefore
+`2^n` amplitudes in the state vector.
+
+## Linear algebra reference
+
+A compact LaTeX reference is kept in:
+
+```text
+docs/quantum_linear_algebra_reference.tex
+```
+
+It covers column and row vectors, transpose and conjugate transpose,
+inner and outer products, Kronecker/tensor products, matrix-vector
+products, matrix-matrix products, and the Bell-state representation.
+
 ## Repository structure
 
-``` text
+```text
 quantum_compute_lab/
+  docs/
+    quantum_linear_algebra_reference.tex
   experiments/
     01_first_qubit/
+      main.py
+    02_bell_state/
       main.py
   README.md
   commands.md
