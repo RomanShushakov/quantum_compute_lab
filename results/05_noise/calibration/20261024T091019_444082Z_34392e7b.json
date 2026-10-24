@@ -1,0 +1,30 @@
+{
+  "backend": "ibm_fez",
+  "calibration_last_update": "2026-10-24 10:36:57+02:00",
+  "experiment": "05_noise",
+  "physical_qubits": 156,
+  "qubit_calibrations": {
+    "0": {
+      "readout_error": 0.0216064453125,
+      "t1_seconds": 5.641357820129526e-05,
+      "t2_seconds": 5.230747577511245e-05
+    },
+    "1": {
+      "readout_error": 0.0257568359375,
+      "t1_seconds": 0.00021704384923324505,
+      "t2_seconds": 0.0002768458273900551
+    }
+  },
+  "recorded_at_utc": "2026-10-24T09:10:19.444082+00:00",
+  "schema_version": 1,
+  "two_qubit_gates": {
+    "cz": {
+      "duration_seconds": 6.8e-08,
+      "error": 0.009316654404477653,
+      "qubits": [
+        0,
+        1
+      ]
+    }
+  }
+}

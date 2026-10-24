@@ -1,53 +1,39 @@
+from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from result_writer import save_result
+
 from qiskit import QuantumCircuit
 from qiskit.transpiler import generate_preset_pass_manager
 from qiskit_ibm_runtime import QiskitRuntimeService
 from qiskit_ibm_runtime.executor_sampler import Sampler
 
-
-# Connect using the IBM Quantum credentials stored locally by Qiskit.
+SHOTS = 1000
 service = QiskitRuntimeService()
-
-# Select an operational QPU that can execute our two-qubit circuit.
-backend = service.least_busy(
-    operational=True,
-    min_num_qubits=2,
-)
-
+backend = service.least_busy(operational=True, min_num_qubits=2)
 print(f"Backend: {backend.name}")
 print(f"Qubits: {backend.num_qubits}")
-
-# Create the same Bell-state circuit used in Experiment 02.
 circuit = QuantumCircuit(2)
 circuit.h(0)
 circuit.cx(0, 1)
 circuit.measure_all()
-
 print("\nLogical circuit:")
 print(circuit)
-
-# Compile the logical circuit into the instruction set and physical
-# qubit topology supported by the selected QPU.
-pass_manager = generate_preset_pass_manager(
-    backend=backend,
-    optimization_level=1,
-)
-
+pass_manager = generate_preset_pass_manager(backend=backend, optimization_level=1)
 isa_circuit = pass_manager.run(circuit)
-
-# Submit the transpiled circuit to the physical QPU.
 sampler = Sampler(mode=backend)
-
-job = sampler.run(
-    [isa_circuit],
-    shots=1000,
-)
-
+job = sampler.run([isa_circuit], shots=SHOTS)
 print(f"\nJob ID: {job.job_id()}")
 print(f"Job status: {job.status()}")
-
-# Wait for the job to complete and retrieve the physical measurements.
 result = job.result()
 counts = result[0].data.meas.get_counts()
-
 print("\nQPU result:")
 print(counts)
+save_result("03_first_qpu", {
+    "backend": backend.name, "job_id": job.job_id(), "shots": SHOTS,
+    "logical_circuit_qasm": circuit.qasm() if hasattr(circuit, "qasm") else None,
+    "logical_circuit_text": str(circuit),
+    "isa_circuit_text": str(isa_circuit),
+    "counts": counts,
+    "probabilities": {s: counts.get(s, 0) / SHOTS for s in ["00", "01", "10", "11"]},
+})

@@ -1,3 +1,8 @@
+from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from result_writer import save_result
+
 from qiskit import QuantumCircuit
 from qiskit.transpiler import generate_preset_pass_manager
 from qiskit_aer import AerSimulator
@@ -123,3 +128,20 @@ print("\nTotal variation distance:")
 print(f"Simulator vs theory: {simulator_vs_theory:.3f}")
 print(f"QPU vs theory:       {qpu_vs_theory:.3f}")
 print(f"Simulator vs QPU:    {simulator_vs_qpu:.3f}")
+
+
+save_result("04_simulator_vs_qpu", {
+    "backend": backend.name,
+    "job_id": qpu_job.job_id(),
+    "shots": SHOTS,
+    "logical_circuit_text": str(circuit),
+    "isa_circuit_text": str(isa_circuit),
+    "theoretical_probabilities": THEORETICAL_PROBABILITIES,
+    "ideal_simulator": {"counts": simulator_counts, "probabilities": simulator_probabilities},
+    "qpu": {"counts": qpu_counts, "probabilities": qpu_probabilities},
+    "total_variation_distance": {
+        "simulator_vs_theory": simulator_vs_theory,
+        "qpu_vs_theory": qpu_vs_theory,
+        "simulator_vs_qpu": simulator_vs_qpu,
+    },
+})

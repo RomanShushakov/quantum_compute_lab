@@ -6,8 +6,9 @@ principles.
 The lab focuses on understanding quantum-computing concepts through
 executable examples rather than only theory. The initial experiments use
 Python and Qiskit, including local simulation and later execution on IBM
-Quantum hardware. Rust-based quantum-computing experiments will be
-explored after the basic concepts and IBM workflow are understood.
+Quantum hardware. After the initial Qiskit and IBM hardware experiments, the lab will
+implement local quantum simulation in Rust, first on the CPU and then
+using Vulkan compute through `ash` on the same development machine.
 
 ## Approach
 
@@ -39,7 +40,13 @@ simulator vs real QPU
 noise and hardware constraints
     |
     v
-Rust quantum experiments
+small quantum algorithm on a QPU (planned)
+    |
+    v
+Rust CPU state-vector simulation
+    |
+    v
+Rust + ash + Vulkan compute simulation
 ```
 
 ## Experiments
@@ -448,6 +455,132 @@ exact theoretical distribution
 The next experiment investigates the physical effects collectively
 described as quantum hardware noise.
 
+### 05 - Noise and hardware properties (in progress)
+
+Inspect physical-qubit calibration data and use it to build an approximate
+local noise model for the Bell circuit. Unlike Experiment 04, the scripts
+in this experiment do not submit physical QPU jobs.
+
+`main.py` queried `ibm_fez` (156 physical qubits) and reported the
+following calibration values for physical qubits 0 and 1:
+
+``` text
+Property                 Qubit 0       Qubit 1
+T1                       56.41 us      217.04 us
+T2                       52.31 us      276.85 us
+Readout error            0.0216        0.0258
+
+CZ on (0, 1):
+  Gate error:            0.009316654404477653
+  Gate duration:         6.8e-08 s (68 ns)
+```
+
+These values are a calibration snapshot, not universal constants. They
+may change over time and may not describe the hardware at the time of an
+earlier QPU job. T1 describes energy relaxation; T2 describes loss of
+phase coherence. Readout and gate errors are separately characterized
+hardware properties, not quantities to simply add together.
+
+`noise_simulation.py` builds an approximate Aer noise model from the IBM
+backend and simulates the backend-transpiled Bell circuit on physical
+qubits 0 and 1. It compares local ideal and noisy simulations with a
+previously recorded QPU distribution. One run produced:
+
+``` text
+State  Ideal  Noisy  QPU (recorded)
+   00  0.513  0.449  0.504
+   01  0.000  0.024  0.033
+   10  0.000  0.032  0.030
+   11  0.487  0.495  0.433
+
+Noisy vs ideal TV distance: 0.064
+Noisy vs QPU TV distance:   0.064
+```
+
+The approximate noise model reproduces nonzero `01` and `10` outcomes,
+but its full probability distribution differs from the recorded QPU run.
+This comparison is exploratory: sampling variation, changing calibration
+and noise-model limitations all matter. A single run cannot establish
+individual hardware error contributions.
+
+The next planned hardware investigation is a compact circuit-depth
+experiment, followed by a small quantum algorithm while QPU access is
+available. These are planned steps, not completed experiments.
+
+## JSON experiment results
+
+Experiment scripts now save machine-readable JSON files under `results/`.
+Each execution creates a new timestamped file rather than overwriting
+previous runs. This is the canonical way to collect new measurements;
+manual transcription of console output is not required.
+
+Observed output locations:
+
+``` text
+results/
+  04_simulator_vs_qpu/
+    <timestamp>_<unique_id>.json
+  05_noise/
+    calibration/
+      <timestamp>_<unique_id>.json
+    noise_simulation/
+      <timestamp>_<unique_id>.json
+```
+
+The updated Experiment 03 script is also configured to save results on
+future runs. Avoid running physical-QPU scripts merely to produce a
+file; they submit real jobs.
+
+The Experiment 04 JSON includes a schema version, UTC recording time,
+backend, IBM job ID, shot count, logical and ISA circuit text, theory,
+ideal simulator and QPU counts/probabilities, and total variation
+distances. The calibration and noise scripts save their own experiment
+results. Keep the generated JSON files with the repository as a
+historical dataset, excluding credentials and other secrets.
+
+A confirmed saved physical reference is:
+
+``` text
+Experiment: 04_simulator_vs_qpu
+Backend:    ibm_fez
+Job ID:     dbe7cpfsstms73fbjo0g
+Shots:      1000
+Aer:        00=489, 11=511
+QPU:        00=481, 01=31, 10=37, 11=451
+TV(Aer, theory): 0.011
+TV(QPU, theory): 0.068
+TV(Aer, QPU):    0.068
+```
+
+Future Rust simulators will be validated against exact mathematical
+predictions and Qiskit Aer. Recorded IBM distributions provide a separate
+physical-hardware reference, not an exact-output target for a noiseless
+simulator. For reproducible comparisons, retain circuit definitions,
+qubit/bit ordering, backend mapping, shots, noise-model configuration,
+software versions and random seeds where available.
+
+## Planned Rust and Vulkan simulator
+
+After the hardware-oriented experiments, develop a local simulator in
+stages:
+
+1. Rust CPU state-vector simulator: complex amplitudes, initialization,
+   single-qubit gates, controlled gates, measurement and sampling.
+2. Verify state vectors, probabilities and circuits against theory and
+   Qiskit Aer, including Bell states and phase-sensitive circuits.
+3. Rust Vulkan compute backend using `ash`, storage buffers, descriptors,
+   command buffers, compute pipelines and SPIR-V shaders.
+4. Implement parallel amplitude-pair updates without constructing full
+   `2^n x 2^n` matrices for elementary gates.
+5. Compare CPU and Vulkan correctness, precision, runtime, memory use,
+   transfer overhead and scaling with qubit count.
+
+All GPU work is planned for the local development machine using Vulkan
+through `ash`; Jetson, Slurm and WebGPU are not part of this plan.
+Classical state-vector simulation still requires exponentially growing
+storage in the general case (`2^n` complex amplitudes). GPU acceleration
+does not remove that fundamental constraint.
+
 ## Linear algebra reference
 
 A compact LaTeX reference is kept in:
@@ -475,10 +608,22 @@ quantum_compute_lab/
       main.py
     04_simulator_vs_qpu/
       main.py
+    05_noise/
+      main.py
+      noise_simulation.py
+  results/
+    04_simulator_vs_qpu/
+      *.json
+    05_noise/
+      calibration/
+        *.json
+      noise_simulation/
+        *.json
   README.md
   commands.md
   requirements.txt
 ```
 
 `commands.md` records the commands used while building and running the
-experiments.
+experiments. The JSON results are intended for future offline analysis
+and Rust CPU/Vulkan simulator comparisons.
