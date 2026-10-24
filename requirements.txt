@@ -7,7 +7,7 @@ cryptography==50.0.2
 dill==0.4.1
 ibm-cloud-sdk-core==3.27.0
 ibm-platform-services==0.77.1
-ibm-quantum-schemas==0.12.20260921
+ibm-quantum-schemas==0.13.20261016
 idna==3.20
 numpy==2.5.3
 openqasm3==1.0.1
@@ -20,9 +20,9 @@ pydantic_core==2.46.5
 PyJWT==2.15.1
 pyspnego==0.12.3
 python-dateutil==2.9.0.post0
-qiskit==2.5.2
-qiskit-aer==0.17.2
-qiskit-ibm-runtime==0.50.0
+qiskit==2.6.1
+qiskit-aer==0.18.0
+qiskit-ibm-runtime==0.51.0
 qiskit-mitigation==0.1.1
 qiskit-qasm3-import==0.6.0
 requests==2.34.2
