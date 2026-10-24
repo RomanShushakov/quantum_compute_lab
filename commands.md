@@ -282,8 +282,46 @@ ls -lh results/05_noise/circuit_depth/
 jq . results/05_noise/circuit_depth/*.json
 ```
 
-## Next - Experiment 06 (planned)
+## Experiment 06 - Bernstein-Vazirani (complete)
 
-Implement Bernstein-Vazirani with local Aer verification first,
-then an explicitly requested IBM QPU execution, saving JSON
-for later Rust CPU and Vulkan (`ash`) comparisons.
+The experiment recovers the secret `1011` using one oracle call.
+The local run uses Qiskit Aer only and saves a JSON result:
+
+```bash
+python experiments/06_bernstein_vazirani/main.py
+```
+
+To deliberately submit one IBM QPU job (1000 shots):
+
+```bash
+python experiments/06_bernstein_vazirani/main.py --submit
+```
+
+Verified local result: `{'1011': 1000}`.
+Verified QPU result: `879 / 1000` correct (87.9%).
+Backend: `ibm_fez`; ISA depth: 16; IBM job ID:
+`dbedvi7pc3tc739lgpog`.
+
+Saved JSON artifacts:
+
+```text
+results/06_bernstein_vazirani/20261024T164113_833544Z_local_97cad56c.json
+results/06_bernstein_vazirani/20261024T164144_897743Z_submitted_e53c276e.json
+results/06_bernstein_vazirani/20261024T164151_358949Z_completed_db0d2c33.json
+```
+
+Inspect results without rerunning or submitting a job:
+
+```bash
+ls -lh results/06_bernstein_vazirani/
+jq . results/06_bernstein_vazirani/*.json
+```
+
+## Next - Rust CPU and Vulkan simulation
+
+Begin with a Rust CPU state-vector implementation of single-qubit gates,
+then Bell states and Bernstein-Vazirani. Validate against mathematical
+expectations and saved Qiskit Aer results. Later implement the same
+operations on the local GPU using Rust `ash` and Vulkan compute.
+No new IBM jobs are required for this phase.
+

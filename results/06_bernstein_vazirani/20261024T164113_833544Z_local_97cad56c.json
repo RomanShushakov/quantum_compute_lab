@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "experiment": "06_bernstein_vazirani",
+  "recorded_at_utc": "2026-10-24T16:41:13.830082+00:00",
+  "secret": "1011",
+  "shots": 1000,
+  "logical_circuit_qasm3": "OPENQASM 3.0;\ninclude \"stdgates.inc\";\nbit[4] c;\nqubit[5] q;\nx q[4];\nh q[4];\nh q[0];\nh q[1];\nh q[2];\nh q[3];\nbarrier q[0], q[1], q[2], q[3], q[4];\ncx q[0], q[4];\ncx q[1], q[4];\ncx q[3], q[4];\nbarrier q[0], q[1], q[2], q[3], q[4];\nh q[0];\nc[0] = measure q[0];\nh q[1];\nc[1] = measure q[1];\nh q[2];\nc[2] = measure q[2];\nh q[3];\nc[3] = measure q[3];\n",
+  "logical_circuit_text": "     ┌───┐      ░                 ░ ┌───┐┌─┐         \nq_0: ┤ H ├──────░───■─────────────░─┤ H ├┤M├─────────\n     ├───┤      ░   │             ░ ├───┤└╥┘┌─┐      \nq_1: ┤ H ├──────░───┼────■────────░─┤ H ├─╫─┤M├──────\n     ├───┤      ░   │    │        ░ ├───┤ ║ └╥┘┌─┐   \nq_2: ┤ H ├──────░───┼────┼────────░─┤ H ├─╫──╫─┤M├───\n     ├───┤      ░   │    │        ░ ├───┤ ║  ║ └╥┘┌─┐\nq_3: ┤ H ├──────░───┼────┼────■───░─┤ H ├─╫──╫──╫─┤M├\n     ├───┤┌───┐ ░ ┌─┴─┐┌─┴─┐┌─┴─┐ ░ └───┘ ║  ║  ║ └╥┘\nq_4: ┤ X ├┤ H ├─░─┤ X ├┤ X ├┤ X ├─░───────╫──╫──╫──╫─\n     └───┘└───┘ ░ └───┘└───┘└───┘ ░       ║  ║  ║  ║ \nc: 4/═════════════════════════════════════╩══╩══╩══╩═\n                                          0  1  2  3 ",
+  "ideal_counts": {
+    "1011": 1000
+  },
+  "ideal_success_probability": 1.0,
+  "mode": "local",
+  "qpu": null
+}

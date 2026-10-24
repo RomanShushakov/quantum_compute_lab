@@ -40,7 +40,7 @@ simulator vs real QPU
 noise and hardware constraints
     |
     v
-Bernstein-Vazirani algorithm on a QPU (planned)
+Bernstein-Vazirani algorithm on a QPU (complete)
     |
     v
 Rust CPU state-vector simulation
@@ -540,7 +540,63 @@ five circuits and saved a submission record followed by completed results.
 Verified local JSON: `20261024T162752_655544Z_local_956e40f3.json`.
 Verified third QPU JSON: `20261024T162815_562300Z_dbedp7vpc3tc739lgg90.json`.
 
-The next planned experiment is 06 - Bernstein-Vazirani algorithm.
+### 06 - Bernstein-Vazirani algorithm (complete)
+
+Recover a hidden four-bit string using a single quantum oracle query.
+The oracle encodes `s = 1011` using three controlled-NOT gates
+from the selected input qubits to an auxiliary qubit prepared in `|->`.
+Hadamard gates before and after the oracle produce the hidden string
+through phase kickback and interference. Qiskit bit strings are displayed
+with the highest-index classical bit on the left.
+
+The local ideal Qiskit Aer execution (1000 shots) returned:
+
+```text
+{'1011': 1000}
+```
+
+The explicit `--submit` execution used `ibm_fez` with 1000 shots.
+The transpiled ISA circuit had depth 16 and operations:
+
+```text
+rz: 22
+sx: 11
+cz: 3
+measure: 4
+barrier: 2
+```
+
+IBM Runtime job ID: `dbedvi7pc3tc739lgpog`.
+The physical QPU returned:
+
+```text
+{'1011': 879, '1111': 14, '1010': 27, '0011': 33,
+ '1001': 25, '0001': 8, '0010': 2, '0000': 7,
+ '1000': 3, '1110': 2}
+```
+
+The measured success rate was `879 / 1000 = 0.879` (87.9%).
+The remaining 121 measurements were different from the expected string.
+This is an empirical hardware result, not a fixed error rate for the
+algorithm or backend. The ideal circuit recovers the secret with certainty.
+
+The experiment saved separate JSON records for local simulation,
+submission, and completed QPU results:
+
+```text
+results/06_bernstein_vazirani/20261024T164113_833544Z_local_97cad56c.json
+results/06_bernstein_vazirani/20261024T164144_897743Z_submitted_e53c276e.json
+results/06_bernstein_vazirani/20261024T164151_358949Z_completed_db0d2c33.json
+```
+
+The completed JSON filename contains a generated suffix rather than the
+IBM job ID; use the submission record and recorded job metadata to link
+artifacts. The script runs locally by default and submits to the QPU
+only when explicitly passed `--submit`.
+
+The next phase is implementing quantum state-vector simulation in Rust,
+starting with a CPU reference and later using Vulkan compute via `ash`.
+
 
 ## JSON experiment results
 
@@ -562,8 +618,8 @@ results/
       <timestamp>_<unique_id>.json
     circuit_depth/
       <timestamp>_<local_or_job_id>.json
-    circuit_depth/
-      <timestamp>_<job_id>.json
+  06_bernstein_vazirani/
+    <timestamp>_<local_submitted_or_completed_id>.json
 ```
 
 The updated Experiment 03 script is also configured to save results on
@@ -600,7 +656,7 @@ software versions and random seeds where available.
 
 ## Planned Rust and Vulkan simulator
 
-After the hardware-oriented experiments, develop a local simulator in
+With experiments 01-06 complete, develop a local simulator in
 stages:
 
 1. Rust CPU state-vector simulator: complex amplitudes, initialization,
@@ -651,6 +707,8 @@ quantum_compute_lab/
       main.py
       noise_simulation.py
       circuit_depth.py
+    06_bernstein_vazirani/
+      main.py
   results/
     04_simulator_vs_qpu/
       *.json
@@ -661,6 +719,8 @@ quantum_compute_lab/
         *.json
       circuit_depth/
         *.json
+    06_bernstein_vazirani/
+      *.json
   README.md
   commands.md
   requirements.txt
