@@ -225,3 +225,65 @@ probabilities, logical and ISA circuits, and total variation distances.
 Experiment 03 also submits a physical QPU job when run; do not rerun it
 just to generate JSON. Future Rust CPU/Vulkan comparisons should load
 existing JSON artifacts offline.
+
+## Experiment 05 - Circuit depth vs hardware noise
+
+The circuit-depth script prepares five identity-equivalent circuits
+with 0, 1, 5, 10 and 25 Hadamard pairs. It prints transpiled ISA
+depths and runs local ideal Aer simulation before QPU submission.
+
+**Historical note:** The original script accidentally submitted a QPU job
+without `--submit`. The corrected script has now been tested: the default
+command performs only local simulation, saves JSON, and does not submit
+a job. QPU submission requires the explicit `--submit` flag.
+
+Inspect circuits and save a local JSON result without a QPU job:
+
+```bash
+python experiments/05_noise/circuit_depth.py
+```
+
+Submit one IBM job containing five 1000-shot circuits only when intended:
+
+```bash
+python experiments/05_noise/circuit_depth.py --submit
+```
+
+Three jobs were completed on `ibm_fez` (1000 shots per circuit):
+
+```text
+dbedl27sstms73fbsam0
+dbedldfpc3tc739lgb2g
+dbedp7vpc3tc739lgg90
+```
+
+A verified local dry run also saved:
+
+```text
+results/05_noise/circuit_depth/20261024T162752_655544Z_local_956e40f3.json
+```
+
+The third QPU run saved its submission and completed results to:
+
+```text
+results/05_noise/circuit_depth/20261024T162815_562300Z_dbedp7vpc3tc739lgg90.json
+```
+
+All circuit-depth machine-readable records are stored under:
+
+```text
+results/05_noise/circuit_depth/
+```
+
+Inspect the saved JSON without submitting another job:
+
+```bash
+ls -lh results/05_noise/circuit_depth/
+jq . results/05_noise/circuit_depth/*.json
+```
+
+## Next - Experiment 06 (planned)
+
+Implement Bernstein-Vazirani with local Aer verification first,
+then an explicitly requested IBM QPU execution, saving JSON
+for later Rust CPU and Vulkan (`ash`) comparisons.

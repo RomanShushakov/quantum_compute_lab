@@ -40,7 +40,7 @@ simulator vs real QPU
 noise and hardware constraints
     |
     v
-small quantum algorithm on a QPU (planned)
+Bernstein-Vazirani algorithm on a QPU (planned)
     |
     v
 Rust CPU state-vector simulation
@@ -455,11 +455,12 @@ exact theoretical distribution
 The next experiment investigates the physical effects collectively
 described as quantum hardware noise.
 
-### 05 - Noise and hardware properties (in progress)
+### 05 - Noise and hardware properties (complete)
 
 Inspect physical-qubit calibration data and use it to build an approximate
-local noise model for the Bell circuit. Unlike Experiment 04, the scripts
-in this experiment do not submit physical QPU jobs.
+local noise model for the Bell circuit. The calibration and local noise-simulation scripts do not submit physical QPU jobs.
+The corrected circuit-depth script performs a local-only dry run by default
+and submits an IBM QPU job only with explicit `--submit`.
 
 `main.py` queried `ibm_fez` (156 physical qubits) and reported the
 following calibration values for physical qubits 0 and 1:
@@ -503,9 +504,43 @@ This comparison is exploratory: sampling variation, changing calibration
 and noise-model limitations all matter. A single run cannot establish
 individual hardware error contributions.
 
-The next planned hardware investigation is a compact circuit-depth
-experiment, followed by a small quantum algorithm while QPU access is
-available. These are planned steps, not completed experiments.
+The circuit-depth experiment tests circuits with `2k` Hadamard gates,
+which ideally implement the identity (`H^(2k) = I`) and always measure
+`0`. Transpilation at optimization level 0 retained increasing physical
+gate sequences on qubit 0. Three IBM QPU jobs were executed, each with
+1000 shots per circuit:
+
+| H pairs | ISA depth | Run 1 P(1) | Run 2 P(1) | Run 3 P(1) |
+| ---: | ---: | ---: | ---: | ---: |
+| 0 | 1 | 0.006 | 0.007 | 0.007 |
+| 1 | 7 | 0.007 | 0.005 | 0.013 |
+| 5 | 31 | 0.025 | 0.039 | 0.034 |
+| 10 | 61 | 0.051 | 0.050 | 0.062 |
+| 25 | 151 | 0.128 | 0.114 | 0.120 |
+
+Run 1: `dbedl27sstms73fbsam0`.
+Run 2: `dbedldfpc3tc739lgb2g`.
+Run 3: `dbedp7vpc3tc739lgg90`.
+
+At 25 pairs, the ISA circuit contained 100 `rz` and 50 `sx` gates
+plus barrier and measurement. Increasing physical circuit depth
+correlated with larger observed deviations from the ideal output.
+These observations do not isolate a particular noise mechanism;
+readout errors, gate errors, decoherence, coherent effects and
+finite-shot variation can all contribute. The 0-pair case still
+includes readout and can produce incorrect outcomes.
+
+The initial invocation without `--submit` also submitted a job due
+to a misplaced dry-run guard; those first two datasets were retained.
+The script was subsequently corrected and verified: running without
+`--submit` printed "Dry run complete. No QPU job submitted." and saved
+a local JSON record; running with `--submit` submitted one job containing
+five circuits and saved a submission record followed by completed results.
+
+Verified local JSON: `20261024T162752_655544Z_local_956e40f3.json`.
+Verified third QPU JSON: `20261024T162815_562300Z_dbedp7vpc3tc739lgg90.json`.
+
+The next planned experiment is 06 - Bernstein-Vazirani algorithm.
 
 ## JSON experiment results
 
@@ -525,6 +560,10 @@ results/
       <timestamp>_<unique_id>.json
     noise_simulation/
       <timestamp>_<unique_id>.json
+    circuit_depth/
+      <timestamp>_<local_or_job_id>.json
+    circuit_depth/
+      <timestamp>_<job_id>.json
 ```
 
 The updated Experiment 03 script is also configured to save results on
@@ -611,6 +650,7 @@ quantum_compute_lab/
     05_noise/
       main.py
       noise_simulation.py
+      circuit_depth.py
   results/
     04_simulator_vs_qpu/
       *.json
@@ -618,6 +658,8 @@ quantum_compute_lab/
       calibration/
         *.json
       noise_simulation/
+        *.json
+      circuit_depth/
         *.json
   README.md
   commands.md
