@@ -317,7 +317,43 @@ ls -lh results/06_bernstein_vazirani/
 jq . results/06_bernstein_vazirani/*.json
 ```
 
-## Next - Rust CPU and Vulkan simulation
+## Rust milestone 01 - Single-qubit state vector (complete)
+
+From the repository root, the Rust workspace was created with:
+
+```bash
+mkdir -p rust
+cd rust
+cargo new quantum_core --lib
+cargo new quantum_cpu --bin
+```
+
+The `rust/Cargo.toml` workspace lists both crates. `quantum_core` depends on
+`num-complex = "0.4"`; `quantum_cpu` uses the local `quantum_core` crate.
+
+Verify formatting, compilation, and the single-qubit executable:
+
+```bash
+cd ~/workdir/quantum_compute_lab/rust
+cargo fmt --all
+cargo check --workspace
+cargo run -p quantum_cpu
+```
+
+The executable prints the `|0>` state, the equal-probability state after
+Hadamard, and the restored `|0>` state after a second Hadamard.
+
+Run the four verified mathematical unit tests:
+
+```bash
+cargo test --workspace
+```
+
+Observed result: **4 passed, 0 failed** in `quantum_core`.
+The tests cover initialization, equal Hadamard probabilities, `H^2 = I`,
+and normalization under 100 repeated Hadamard applications.
+
+## Next - Multi-qubit Rust state vectors and Vulkan simulation
 
 Begin with a Rust CPU state-vector implementation of single-qubit gates,
 then Bell states and Bernstein-Vazirani. Validate against mathematical

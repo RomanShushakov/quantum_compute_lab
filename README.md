@@ -654,7 +654,54 @@ simulator. For reproducible comparisons, retain circuit definitions,
 qubit/bit ordering, backend mapping, shots, noise-model configuration,
 software versions and random seeds where available.
 
-## Planned Rust and Vulkan simulator
+## Rust CPU simulator - milestone 01 (complete)
+
+The first Rust milestone reproduces Experiment 01 without Qiskit or a
+quantum simulation library. The workspace currently contains:
+
+- `quantum_core`: a `Qubit` with two `num_complex::Complex64` amplitudes,
+  initialization to `|0>`, an in-place Hadamard operation, and probabilities
+  computed with `norm_sqr()`.
+- `quantum_cpu`: a small executable that prints amplitudes and probabilities
+  before and after one and two Hadamard gates.
+
+For a qubit `|psi> = alpha|0> + beta|1>`, the Hadamard implementation updates
+its amplitudes as:
+
+```text
+alpha' = (alpha + beta) / sqrt(2)
+beta'  = (alpha - beta) / sqrt(2)
+P(0)   = |alpha|^2
+P(1)   = |beta|^2
+```
+
+Verified output on the laptop (WSL2 Ubuntu):
+
+| Stage | P(0) | P(1) |
+| --- | ---: | ---: |
+| Initial `|0>` | 1.000000 | 0.000000 |
+| After `H` | 0.500000 | 0.500000 |
+| After `H` twice | 1.000000 | 0.000000 |
+
+After two Hadamards, the first amplitude was
+`0.9999999999999998 + 0i`; the small deviation from 1 is ordinary
+floating-point rounding. This milestone computes exact state-vector
+probabilities (subject to floating-point precision), not random measurement
+samples.
+
+Four unit tests in `quantum_core` passed:
+
+1. `initial_state_is_zero`
+2. `hadamard_creates_equal_probabilities`
+3. `hadamard_twice_is_identity`
+4. `state_remains_normalized` (100 successive Hadamard applications)
+
+The verified command `cargo test --workspace` reported four passing tests,
+zero failures. The next Rust step is a general `StateVector` for multiple
+qubits, followed by Bell-state preparation and controlled gates. This will
+establish the amplitude-pair indexing needed for the later Vulkan backend.
+
+## Rust and Vulkan simulator roadmap
 
 With experiments 01-06 complete, develop a local simulator in
 stages:
@@ -721,6 +768,17 @@ quantum_compute_lab/
         *.json
     06_bernstein_vazirani/
       *.json
+  rust/
+    Cargo.toml
+    Cargo.lock
+    quantum_core/
+      Cargo.toml
+      src/
+        lib.rs
+    quantum_cpu/
+      Cargo.toml
+      src/
+        main.rs
   README.md
   commands.md
   requirements.txt
