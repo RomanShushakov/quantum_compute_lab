@@ -1,18 +1,26 @@
 # Quantum Compute Lab
 
-Small hands-on experiments for learning quantum computing from first
-principles.
+A reproducible learning and engineering lab for quantum algorithms, numerical
+linear algebra, and state-vector simulation.
 
-The lab focuses on understanding quantum-computing concepts through
-executable examples rather than only theory. The initial experiments use
-Python and Qiskit, including local simulation and later execution on IBM
-Quantum hardware. After the initial Qiskit and IBM hardware experiments, the lab implements
-local quantum simulation in Rust. The CPU simulator supports Bell-state and
-Bernstein-Vazirani experiments, diagonal and interacting two-qubit VQE,
-parameter-shift gradient descent, and Pauli expectation values. A generalized
-Jacobi eigensolver provides an independent classical reference, including
-Bathe Exercise 11.1, eigenpair residuals, mass orthonormality, and VQE
-ground-state fidelity. Vulkan compute via `ash` remains planned.
+**Phase 1 - Quantum fundamentals, algorithms, and IBM QPU (complete,
+2026-10-25).** Experiments 01-09 cover Qiskit/Aer, IBM Quantum hardware,
+noise diagnostics, Bernstein-Vazirani, Rust CPU VQE, and Bathe Exercise 11.1.
+The final IBM Kingston tests investigated a poor physical-qubit mapping,
+reduced the Bathe VQE absolute energy error by about 94.1% through qubit
+selection, and validated Bell-state correlations. Historical QPU results
+are preserved as JSON; no further IBM access is required for Phase 2.
+
+**Phase 2 - Rust CPU to Vulkan GPU state-vector engine (planned).** The
+existing `quantum_core` and `quantum_cpu` code is the correctness baseline.
+Next steps are CPU benchmarks, gate-kernel and memory-layout improvements,
+then Vulkan compute via Rust `ash`, with accuracy and performance comparisons
+against the CPU implementation and Qiskit Aer. See
+`docs/phase_2_simulator_plan.md`.
+
+The goal is engineering understanding and reproducible measurements, not a
+claim of quantum advantage. QPU error depends on device conditions and
+circuit structure; the recorded results are historical observations.
 
 ## Approach
 
@@ -59,7 +67,10 @@ Non-diagonal VQE and classical Jacobi comparison (complete)
 Bathe Exercise 11.1 and numerical validation (complete)
     |
     v
-Rust + ash + Vulkan compute simulation (planned)
+IBM Kingston Bathe VQE diagnostics and Bell validation (complete)
+    |
+    v
+Rust CPU benchmarking and Vulkan compute simulation (planned)
 ```
 
 ## Experiments
@@ -874,39 +885,25 @@ The original single-qubit `Qubit` remains an introductory example;
 `StateVector` is the multi-qubit implementation used by newer circuits.
 Executable commands are maintained separately in `commands.md`.
 
-## Applied quantum algorithms and numerical computing roadmap
+## Engineering roadmap
 
-Completed milestones:
+Phase 1 is complete: interacting VQE, generalized Jacobi validation,
+Bathe Exercise 11.1, fixed-angle Aer/QPU comparisons, physical-pair
+calibration, and Bell-state verification. See `docs/09_bathe_vqe_qpu.md`
+for hardware job IDs and the limits of the conclusions.
 
-1. Non-diagonal two-qubit VQE with an entangling ansatz and exact energy
-   reference.
-2. Generalized Jacobi eigensolver informed by Bathe's `JACOBI.FOR`, including
-   Exercise 11.1 and eigenpair/mass-orthogonality validation.
-3. Ground-state fidelity comparison between the VQE ansatz, the grid-search
-   result, and the classical Jacobi eigenvector.
-
-Possible next steps:
-
-1. Compare a fixed optimized circuit against Qiskit Aer and optionally an
-   IBM QPU. Finite-shot QPU measurements are not exact eigenvalues.
-2. Explore more challenging Hamiltonians and ansatz/optimizer behavior.
-3. Develop a Rust Vulkan compute backend using `ash` and compare CPU/GPU
-   accuracy, runtime, memory usage, and transfer overhead.
-4. If a larger sparse numerical problem warrants it, investigate CSR and
-   suitable sparse solvers separately; keep the present small problems dense.
-5. Optionally examine other Bathe routines such as `SSPACE.FOR` and the
-   existing Rust numerical projects (`colsol`, `iterative_solvers`,
-   `extended_matrix`) as references. No integration is required.
+Phase 2 prioritizes the local Rust state-vector simulator: establish a
+repeatable CPU baseline, profile gate operations and memory use, improve
+CPU kernels where justified, then implement and benchmark Vulkan compute
+kernels with `ash`. Detailed milestones and acceptance criteria are in
+`docs/phase_2_simulator_plan.md`. Return to QPU hardware only for a
+specific, testable research question; it is not a Phase 2 dependency.
 
 A classical eigensolver and a quantum eigensolver are different algorithms;
-solving a FEM eigenproblem does not imply a quantum speedup. Local VQE
-experiments simulate quantum circuits on a classical computer; they do not
-require IBM Quantum access or demonstrate quantum advantage.
-
-All GPU work is planned for the local development machine using Vulkan
-through `ash`; Jetson, Slurm and WebGPU are not part of this plan. General
+solving a FEM eigenproblem does not imply a quantum speedup. General
 state-vector simulation requires `2^n` complex amplitudes, and GPU
-acceleration does not remove that storage cost.
+acceleration does not remove that memory cost. GPU work is planned for
+the local development machine, not the Jetson, Slurm, or WebGPU stack.
 
 ## Linear algebra reference
 
@@ -943,59 +940,41 @@ Source and commands are described in
 
 ## Repository structure
 
-``` text
+```text
 quantum_compute_lab/
   docs/
+    08_bathe_vqe.md
+    08_bathe_vqe_step2.md
+    08_bathe_vqe_step3.md
+    09_bathe_vqe_qpu.md
+    bathe_exercise_11_1.md
+    phase_2_simulator_plan.md
     quantum_linear_algebra_reference.tex
   experiments/
-    01_first_qubit/
-      main.py
-    02_bell_state/
-      main.py
-    03_first_qpu/
-      main.py
-    04_simulator_vs_qpu/
-      main.py
-    05_noise/
-      main.py
-      noise_simulation.py
-      circuit_depth.py
-    06_bernstein_vazirani/
-      main.py
-  results/
-    04_simulator_vs_qpu/
-      *.json
-    05_noise/
-      calibration/
-        *.json
-      noise_simulation/
-        *.json
-      circuit_depth/
-        *.json
-    06_bernstein_vazirani/
-      *.json
+    01_first_qubit/          main.py
+    02_bell_state/           main.py
+    03_first_qpu/            main.py
+    04_simulator_vs_qpu/     main.py
+    05_noise/                main.py, noise_simulation.py, circuit_depth.py
+    06_bernstein_vazirani/   main.py
+    07_interacting_vqe/      main.py, verify_isa_local.py
+    08_bathe_vqe_aer/        main.py
+    09_bathe_vqe_qpu/        main.py, calibrate.py, diagnose.py, bell_state.py
+  results/                  historical JSON results (04-07, 09)
   rust/
+    quantum_core/src/       lib.rs, tests/
+    quantum_cpu/src/        main.rs, algorithms, numerical solvers, tests/
     Cargo.toml
-    Cargo.lock
-    quantum_core/
-      Cargo.toml
-      src/
-        lib.rs
-        tests.rs
-    quantum_cpu/
-      Cargo.toml
-      src/
-        main.rs
-        bernstein_vazirani.rs
-        vqe.rs
-        vqe_two_qubit.rs
-        vqe_interacting.rs
-        jacobi.rs
+  result_writer.py
   README.md
   commands.md
   requirements.txt
 ```
 
-`commands.md` records the commands used while building and running the
-experiments. The JSON results are intended for future offline analysis
-and Rust CPU/Vulkan simulator comparisons.
+`experiments/` contains executable Python examples; `results/` contains
+recorded measurements and local results. The Rust crates provide the CPU
+reference for Phase 2. `commands.md` is the runnable command reference.
+
+The `08_bathe_vqe_step2.md` and `08_bathe_vqe_step3.md` names are retained
+as historical experiment notes rather than renamed, so existing references
+and experiment numbering remain stable.

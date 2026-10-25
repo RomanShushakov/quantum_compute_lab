@@ -477,31 +477,22 @@ with zero Clippy warnings. These commands run locally and do not submit
 IBM QPU jobs.
 
 
-cargo fmt --all
-cargo check --workspace
-cargo test --workspace
-cargo clippy --workspace --all-targets -- -D warnings
-cargo run -p quantum_cpu
+### Experiment 07 - Python and local ISA verification
 
+From the repository root with the Python environment active:
 
-cd ~/workdir/quantum_compute_lab
-source venv/bin/activate
-
-python experiments/07_interacting_vqe/main.py --shots 10000
-
-
+```bash
 python experiments/07_interacting_vqe/main.py --help
-
-
-python experiments/07_interacting_vqe/main.py --submit --shots 10000
-
-
-source venv/bin/activate
-
+python experiments/07_interacting_vqe/main.py --shots 10000
 python experiments/07_interacting_vqe/verify_isa_local.py \
   results/07_interacting_vqe/20261025T153427_754798Z_completed.json
+```
 
+Historical QPU submission (requires access; not part of Phase 2):
 
+```bash
+python experiments/07_interacting_vqe/main.py --submit --shots 10000
+```
 
 ## Experiment 09 - Bathe VQE QPU diagnostics
 
@@ -558,3 +549,22 @@ The Bell job used 4096 shots per basis. Its first submission attempt failed
 during IBM Cloud IAM connection setup (`Connection reset by peer`); a
 second attempt completed successfully. The earlier failure did not return
 a job ID and is not evidence of an invalid API key.
+
+## Phase 2 - Local Rust simulator development
+
+Phase 1 is complete. IBM QPU commands above are historical and optional;
+Phase 2 runs locally without IBM credentials.
+
+```bash
+cd rust
+cargo fmt --all -- --check
+cargo check --workspace
+cargo test --workspace
+cargo clippy --workspace --all-targets -- -D warnings
+cargo run -p quantum_cpu
+```
+
+Return to the repository root with `cd ..`. Record benchmark hardware,
+compiler/build profile, input size, repetitions, elapsed time, and numerical
+error before comparing CPU and GPU results. See
+`docs/phase_2_simulator_plan.md`. No Vulkan benchmark results exist yet.

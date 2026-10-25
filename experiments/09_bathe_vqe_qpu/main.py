@@ -69,7 +69,9 @@ def expectation_from_counts(counts: dict[str, int], pauli: str) -> float:
 
 
 def grouped_bases() -> dict[str, list[str]]:
+    """Group Pauli terms by compatible local measurement axes."""
     groups: dict[str, list[str]] = defaultdict(list)
+    # I can be measured in any basis; Z is a consistent group placeholder.
     for pauli in PAULI_TERMS:
         if pauli != "II":
             groups[pauli.replace("I", "Z")].append(pauli)

@@ -20,9 +20,11 @@ IDEAL = {"XX": 1.0, "YY": -1.0, "ZZ": 1.0}
 
 
 def bell_circuit(basis: str) -> QuantumCircuit:
+    """Prepare Phi+ and rotate each Pauli measurement into the Z basis."""
     qc = QuantumCircuit(2)
     qc.h(0)
     qc.cx(0, 1)
+    # Qiskit Pauli strings are written high-to-low qubit (q1, q0).
     for qubit, axis in enumerate(reversed(basis)):
         if axis == "X":
             qc.h(qubit)
@@ -34,6 +36,8 @@ def bell_circuit(basis: str) -> QuantumCircuit:
 
 
 def verify_isa(logical: QuantumCircuit, compiled: QuantumCircuit, physical: list[int]) -> list[list[int]]:
+    """Check physical/classical mapping and noiseless transpiled probabilities."""
+    # Simulate only active qubits: the backend circuit may allocate hundreds.
     active = sorted({compiled.find_bit(q).index for ins in compiled.data for q in ins.qubits})
     if len(active) > 12:
         raise RuntimeError("Too many active qubits for local verification")
@@ -64,6 +68,7 @@ def verify_isa(logical: QuantumCircuit, compiled: QuantumCircuit, physical: list
 
 
 def correlation(counts: dict[str, int]) -> tuple[float, float]:
+    """Estimate Pauli parity and finite-shot SE; exclude hardware bias."""
     shots = sum(counts.values())
     if shots < 2:
         raise ValueError("At least two shots are required")

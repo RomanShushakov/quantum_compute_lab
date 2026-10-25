@@ -32,6 +32,8 @@ impl Qubit {
     }
 }
 
+// Little-endian basis indexing: qubit 0 corresponds to bit 0 of the
+// amplitude index. The vector stores 2^num_qubits complex amplitudes.
 pub struct StateVector {
     pub num_qubits: usize,
     pub amplitudes: Vec<Complex64>,
@@ -65,6 +67,8 @@ impl StateVector {
     pub fn hadamard(&mut self, target: usize) {
         assert!(target < self.num_qubits, "invalid target qubit");
 
+        // A Hadamard mixes amplitude pairs whose indices differ only in
+        // the target bit; each pair is visited exactly once.
         let stride = 1usize << target;
         let block_size = stride * 2;
         let factor = 1.0 / 2.0_f64.sqrt();
@@ -88,6 +92,8 @@ impl StateVector {
         assert!(target < self.num_qubits, "invalid target qubit");
         assert_ne!(control, target, "control and target must differ");
 
+        // Swap |...control=1,target=0> with its target-flipped partner.
+        // Restricting to target=0 avoids swapping each pair twice.
         let control_mask = 1usize << control;
         let target_mask = 1usize << target;
 

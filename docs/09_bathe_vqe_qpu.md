@@ -4,6 +4,10 @@ This is the real-hardware continuation of Experiment 08 (`experiments/08_bathe_v
 
 The optimized Rust angles and 10 Pauli coefficients are fixed. No hardware optimization is performed. Five compatible measurement bases are measured independently. The program uses IBM Runtime SamplerV2 and validates the ideal measurement distributions of the transpiled circuits before submission.
 
+**Status:** Phase 1 completed on 2026-10-25. The commands below document
+historical QPU runs; IBM access is not needed for the next local simulator
+phase. The device calibration and noise results are not universal constants.
+
 ## Requirements
 
 In the existing Python virtual environment:
@@ -139,3 +143,15 @@ remain unresolved.
 The IBM Runtime SamplerV2 deprecation warning is not a job failure;
 a future maintenance step should migrate to the supported client-side
 Sampler API after verifying its result format.
+
+## Closeout and next phase
+
+Experiments 01-09 conclude Phase 1. The QPU investigation established a
+reproducible workflow and showed the importance of physical-qubit selection,
+but did not separate readout, initialization, gate, and drift contributions.
+The Bathe energy remains above the exact reference even on pair [88, 89].
+
+No more QPU runs are planned as a prerequisite. Phase 2 will benchmark the
+existing Rust CPU simulator and develop local Vulkan compute kernels; see
+`docs/phase_2_simulator_plan.md`. Revisit QPU experiments only to answer a
+specific hardware or algorithmic question.
