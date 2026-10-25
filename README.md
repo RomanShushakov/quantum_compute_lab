@@ -7,10 +7,12 @@ The lab focuses on understanding quantum-computing concepts through
 executable examples rather than only theory. The initial experiments use
 Python and Qiskit, including local simulation and later execution on IBM
 Quantum hardware. After the initial Qiskit and IBM hardware experiments, the lab implements
-local quantum simulation in Rust. The CPU simulator now supports Bell-state and Bernstein-Vazirani
-experiments, one- and two-qubit VQE, parameter-shift gradient descent, and
-Pauli expectation values. Next steps are non-diagonal Hamiltonians, classical
-eigenvalue comparisons, and Vulkan compute via `ash` on the same machine.
+local quantum simulation in Rust. The CPU simulator supports Bell-state and
+Bernstein-Vazirani experiments, diagonal and interacting two-qubit VQE,
+parameter-shift gradient descent, and Pauli expectation values. A generalized
+Jacobi eigensolver provides an independent classical reference, including
+Bathe Exercise 11.1, eigenpair residuals, mass orthonormality, and VQE
+ground-state fidelity. Vulkan compute via `ash` remains planned.
 
 ## Approach
 
@@ -51,10 +53,10 @@ Rust CPU state-vector simulation (Bell and Bernstein-Vazirani complete)
 One- and two-qubit VQE with diagonal Hamiltonians (complete)
     |
     v
-Non-diagonal VQE and classical Jacobi eigenvalue comparison (planned)
+Non-diagonal VQE and classical Jacobi comparison (complete)
     |
     v
-Bathe numerical examples and Fortran solver references
+Bathe Exercise 11.1 and numerical validation (complete)
     |
     v
 Rust + ash + Vulkan compute simulation (planned)
@@ -773,6 +775,81 @@ The trial circuit uses no entangling gate because this diagonal Hamiltonian
 has product states in its ground-state subspace. These are ideal CPU
 state-vector calculations, not physical IBM QPU measurements.
 
+### Interacting two-qubit VQE and classical eigenvalue reference
+
+`quantum_cpu/src/vqe_interacting.rs` implements the non-diagonal Hamiltonian
+`H = Z0 + Z1 + 0.5 X0X1`. The entangling `Ry` + `CNOT` ansatz prepares
+`cos(theta/2)|00> + sin(theta/2)|11>`. A 10,000-step grid search gives:
+
+```text
+Optimal theta: 3.386637
+Minimum energy: -2.061552808
+Exact ground energy: -2.061552813
+```
+
+The exact ground-state energy is `-sqrt(17)/2`. The difference between the
+reported VQE and exact energies is approximately `5e-9`.
+
+`quantum_cpu/src/jacobi.rs` implements a generalized Jacobi eigensolver for
+`K * phi = lambda * M * phi`, based on the generalized Jacobi method in
+Klaus-Juergen Bathe's *Finite Element Procedures* (`JACOBI.FOR`). The current
+implementation uses dense `Vec<Vec<f64>>` matrices. For the interacting
+Hamiltonian, `K = H + 3I` and `M = I` make the input stiffness matrix
+positive definite without changing eigenvectors. Subtracting 3 from each
+computed eigenvalue recovers the original Hamiltonian spectrum:
+
+```text
+Jacobi converged: true
+Sweeps: 2
+Original H eigenvalues:
+-2.061552813
+-0.500000000
+ 0.500000000
+ 2.061552813
+Ground-state eigenvector (column 0):
+-0.122183264
+ 0.000000000
+ 0.000000000
+ 0.992507557
+```
+
+The ground-state fidelity is `|<phi_jacobi|psi_vqe>|^2`. Fidelity is
+independent of the global sign/phase of a normalized quantum state. The
+analytical angle `pi + atan(0.25)` verifies the ansatz against the Jacobi
+eigenvector; the grid-optimized angle independently checks the optimizer:
+
+```text
+VQE/Jacobi ground-state fidelity: 1.000000000000
+Grid-optimized VQE/Jacobi fidelity: 0.999999998925
+```
+
+The analytical-angle comparison tests the state representation; the
+optimized-angle comparison includes grid discretization error. Both are
+ideal CPU state-vector calculations, not physical-QPU measurements.
+
+### Bathe Exercise 11.1 and numerical checks
+
+The same generalized Jacobi implementation was checked against the 3x3
+stiffness and mass matrices from Bathe Exercise 11.1. It converged in six
+sweeps and returned:
+
+| Eigenvalue | Euclidean eigenpair residual |
+| ---: | ---: |
+| 0.724456494 | 4.041e-16 |
+| 2.965179863 | 1.159e-15 |
+| 9.310363643 | 2.878e-15 |
+
+The residual is `||K*phi_i - lambda_i*M*phi_i||_2`, evaluated using the
+original input matrices. The mass Gram matrix `Phi^T * M * Phi` is the
+identity to the nine displayed decimal places, confirming mass
+normalization and mutual orthogonality. The implementation includes tests
+for these checks and for invalid tolerance and nonsymmetric input.
+
+Dense matrices are appropriate for these small reference problems. CSR
+storage and PCG linear solves are not part of the current eigensolver;
+they may be investigated separately for larger sparse problems. PCG is a
+linear-system solver, not a replacement for generalized Jacobi.
+
 ### Pauli expectation values
 
 `StateVector` computes exact expectations for `Z`, `ZZ`, and `XX` from
@@ -787,10 +864,11 @@ The workspace contains `quantum_core` (library) and `quantum_cpu`
 (executable). `rand` is declared under `[workspace.dependencies]` and used
 by both crates; `quantum_core` also uses `num-complex`.
 
-Verified locally: **36 `quantum_core` tests + 14 `quantum_cpu` tests = 50
+Verified locally: **36 `quantum_core` tests + 28 `quantum_cpu` tests = 64
 passed**. `cargo check` and Clippy with warnings denied completed cleanly.
 The tests cover state preparation, gates, normalization, measurement,
-Bernstein-Vazirani, rotations, Pauli expectations, and both VQE examples.
+Bernstein-Vazirani, rotations, Pauli expectations, diagonal and interacting
+VQE, generalized Jacobi, residuals, mass orthonormality, and fidelity.
 
 The original single-qubit `Qubit` remains an introductory example;
 `StateVector` is the multi-qubit implementation used by newer circuits.
@@ -798,36 +876,37 @@ Executable commands are maintained separately in `commands.md`.
 
 ## Applied quantum algorithms and numerical computing roadmap
 
-The next objective is to test quantum algorithms on meaningful numerical
-problems, not merely reproduce quantum circuits:
+Completed milestones:
 
-1. Extend the completed diagonal VQE examples to a non-diagonal two-qubit
-   Hamiltonian, with an entangling ansatz and local optimization. Compare
-   its lowest eigenvalue with an exact reference and a classical Rust Jacobi
-   eigensolver.
-2. Investigate eigenvalue examples from Klaus-Juergen Bathe's *Finite
-   Element Procedures*, using accompanying Fortran routines such as
-   `JACOBI.FOR` and `SSPACE.FOR` as algorithm references where suitable.
-   These routines have not yet been compared or executed in this lab.
-3. Evaluate whether any of the user's existing Rust numerical projects
-   (`colsol`, `iterative_solvers`, `extended_matrix`) are useful references
-   or reusable components. Integration is optional, not a prerequisite.
-4. Optionally compare a fixed optimized circuit against Qiskit Aer and
-   an IBM QPU when access is available; do not treat finite-shot QPU
-   measurements as exact eigenvalues.
-5. Develop a Rust Vulkan compute backend using `ash`, with suitable
-   amplitude-update and numerical kernels, then compare CPU/GPU accuracy,
-   performance, memory usage, and data-transfer overhead.
+1. Non-diagonal two-qubit VQE with an entangling ansatz and exact energy
+   reference.
+2. Generalized Jacobi eigensolver informed by Bathe's `JACOBI.FOR`, including
+   Exercise 11.1 and eigenpair/mass-orthogonality validation.
+3. Ground-state fidelity comparison between the VQE ansatz, the grid-search
+   result, and the classical Jacobi eigenvector.
+
+Possible next steps:
+
+1. Compare a fixed optimized circuit against Qiskit Aer and optionally an
+   IBM QPU. Finite-shot QPU measurements are not exact eigenvalues.
+2. Explore more challenging Hamiltonians and ansatz/optimizer behavior.
+3. Develop a Rust Vulkan compute backend using `ash` and compare CPU/GPU
+   accuracy, runtime, memory usage, and transfer overhead.
+4. If a larger sparse numerical problem warrants it, investigate CSR and
+   suitable sparse solvers separately; keep the present small problems dense.
+5. Optionally examine other Bathe routines such as `SSPACE.FOR` and the
+   existing Rust numerical projects (`colsol`, `iterative_solvers`,
+   `extended_matrix`) as references. No integration is required.
 
 A classical eigensolver and a quantum eigensolver are different algorithms;
-solving a FEM eigenproblem does not automatically imply a quantum speedup.
-Local VQE experiments simulate quantum circuits on a classical computer;
-they do not require IBM Quantum access or demonstrate quantum advantage.
+solving a FEM eigenproblem does not imply a quantum speedup. Local VQE
+experiments simulate quantum circuits on a classical computer; they do not
+require IBM Quantum access or demonstrate quantum advantage.
 
 All GPU work is planned for the local development machine using Vulkan
-through `ash`; Jetson, Slurm and WebGPU are not part of this plan.
-Classical state-vector simulation requires `2^n` complex amplitudes in
-the general case. GPU acceleration does not remove that storage cost.
+through `ash`; Jetson, Slurm and WebGPU are not part of this plan. General
+state-vector simulation requires `2^n` complex amplitudes, and GPU
+acceleration does not remove that storage cost.
 
 ## Linear algebra reference
 
@@ -889,6 +968,8 @@ quantum_compute_lab/
         bernstein_vazirani.rs
         vqe.rs
         vqe_two_qubit.rs
+        vqe_interacting.rs
+        jacobi.rs
   README.md
   commands.md
   requirements.txt

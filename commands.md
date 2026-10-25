@@ -350,13 +350,14 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo run -p quantum_cpu
 ```
 
-Verified: **50 tests passed** (36 in `quantum_core`, 14 in
+Verified: **64 tests passed** (36 in `quantum_core`, 28 in
 `quantum_cpu`), zero failures, and no Clippy warnings.
 
 `quantum_core/src/tests.rs` contains the core unit tests.
 `quantum_cpu/src/bernstein_vazirani.rs` contains the Bernstein-Vazirani
-implementation and its tests. `vqe.rs` and `vqe_two_qubit.rs` contain the
-VQE experiments and tests.
+implementation and its tests. `vqe.rs`, `vqe_two_qubit.rs`, and `vqe_interacting.rs` contain the
+VQE experiments and tests. `jacobi.rs` contains the generalized Jacobi
+eigensolver and numerical validation tests.
 
 ### Bell-state output
 
@@ -402,9 +403,75 @@ Verified energies: `H = Z` gives `-1.000000` using both grid search and
 gradient descent; `H = Z0 + Z1 + Z0Z1` gives `-1.000000` using a two-angle
 grid search.
 
-## Next - Non-diagonal Hamiltonian
+## Rust interacting VQE and generalized Jacobi - completed
 
-Continue with a non-diagonal two-qubit Hamiltonian and classical Jacobi
-reference. The `XX` expectation is implemented and tested; no non-diagonal
-VQE or Jacobi executable has been added yet. IBM QPU submission is not
-part of the Rust commands above.
+The Rust executable also runs an interacting two-qubit VQE experiment with
+`H = Z0 + Z1 + 0.5 X0X1`, a classical generalized Jacobi reference, and
+Bathe Exercise 11.1. The Jacobi implementation uses dense matrices; CSR
+and PCG are not required for these small examples.
+
+Run all Rust checks and the complete demonstration from `rust/`:
+
+```bash
+cd ~/workdir/quantum_compute_lab/rust
+cargo fmt --all
+cargo check --workspace
+cargo test --workspace
+cargo clippy --workspace --all-targets -- -D warnings
+cargo run -p quantum_cpu
+```
+
+Verified interacting VQE output:
+
+```text
+Interacting two-qubit VQE experiment
+Hamiltonian: Z0 + Z1 + 0.5 X0X1
+Optimal theta: 3.386637
+Minimum energy: -2.061552808
+Exact ground energy: -2.061552813
+```
+
+The Jacobi reference solves `K*phi = lambda*M*phi` using `K = H + 3I`
+and `M = I`. Subtracting 3 from the shifted eigenvalues recovers the
+original Hamiltonian spectrum. It converged in two sweeps:
+
+```text
+Original H eigenvalues:
+-2.061552813
+-0.500000000
+ 0.500000000
+ 2.061552813
+Ground-state eigenvector:
+-0.122183264
+ 0.000000000
+ 0.000000000
+ 0.992507557
+VQE/Jacobi ground-state fidelity: 1.000000000000
+Grid-optimized VQE/Jacobi fidelity: 0.999999998925
+```
+
+The first fidelity uses the analytical optimal angle `pi + atan(0.25)`;
+the second uses the actual grid-search angle. Fidelity is insensitive to
+the global sign/phase of the eigenvector.
+
+Bathe Exercise 11.1 provides a separate generalized eigenproblem test:
+
+```text
+Bathe Exercise 11.1 - Generalized eigenproblem
+Converged: true
+Sweeps: 6
+Eigenpair 1: lambda = 0.724456494, residual = 4.041e-16
+Eigenpair 2: lambda = 2.965179863, residual = 1.159e-15
+Eigenpair 3: lambda = 9.310363643, residual = 2.878e-15
+Mass Gram matrix (Phi^T M Phi):
+   1.000000000   -0.000000000   -0.000000000
+  -0.000000000    1.000000000    0.000000000
+  -0.000000000    0.000000000    1.000000000
+```
+
+`jacobi::eigenpair_residuals()` checks
+`||K*phi_i - lambda_i*M*phi_i||_2` using the original matrices, while
+`jacobi::mass_gram_matrix()` checks `Phi^T*M*Phi` against the identity.
+The full Rust test suite currently passes 64 tests (36 core, 28 CPU),
+with zero Clippy warnings. These commands run locally and do not submit
+IBM QPU jobs.

@@ -1,3 +1,6 @@
+// external imports
+use std::f64::consts::PI;
+
 // internal imports
 use quantum_core::StateVector;
 
@@ -26,10 +29,10 @@ pub fn optimize(steps: usize) -> VqeTwoQubitResult {
     };
 
     for step_0 in 0..=steps {
-        let theta_0 = 2.0 * std::f64::consts::PI * step_0 as f64 / steps as f64;
+        let theta_0 = 2.0 * PI * step_0 as f64 / steps as f64;
 
         for step_1 in 0..=steps {
-            let theta_1 = 2.0 * std::f64::consts::PI * step_1 as f64 / steps as f64;
+            let theta_1 = 2.0 * PI * step_1 as f64 / steps as f64;
 
             let current_energy = energy(theta_0, theta_1);
 
@@ -59,12 +62,12 @@ mod tests {
 
     #[test]
     fn pi_rotation_gives_ground_state_energy() {
-        assert!((energy(std::f64::consts::PI, 0.0) + 1.0).abs() < EPSILON);
+        assert!((energy(PI, 0.0) + 1.0).abs() < EPSILON);
     }
 
     #[test]
     fn both_pi_rotations_give_ground_state_energy() {
-        assert!((energy(std::f64::consts::PI, std::f64::consts::PI) + 1.0).abs() < EPSILON);
+        assert!((energy(PI, PI) + 1.0).abs() < EPSILON);
     }
 
     #[test]

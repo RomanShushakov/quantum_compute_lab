@@ -1,3 +1,6 @@
+// external imports
+use std::f64::consts::PI;
+
 // internal imports
 use quantum_core::StateVector;
 
@@ -23,7 +26,7 @@ pub fn optimize(steps: usize) -> VqeResult {
     };
 
     for step in 0..=steps {
-        let theta = 2.0 * std::f64::consts::PI * step as f64 / steps as f64;
+        let theta = 2.0 * PI * step as f64 / steps as f64;
 
         let current_energy = energy(theta);
 
@@ -75,13 +78,15 @@ pub fn optimize_gradient_descent(
 
 #[cfg(test)]
 mod tests {
+    use std::f64::consts::PI;
+
     use super::*;
 
     const EPSILON: f64 = 1e-12;
 
     #[test]
     fn energy_matches_cosine() {
-        let angles = [0.0, std::f64::consts::FRAC_PI_2, std::f64::consts::PI, 1.3];
+        let angles = [0.0, std::f64::consts::FRAC_PI_2, PI, 1.3];
 
         for theta in angles {
             assert!((energy(theta) - theta.cos()).abs() < EPSILON);
@@ -93,7 +98,7 @@ mod tests {
         let result = optimize(100);
 
         assert!((result.energy + 1.0).abs() < EPSILON);
-        assert!((result.theta - std::f64::consts::PI).abs() < EPSILON);
+        assert!((result.theta - PI).abs() < EPSILON);
     }
 
     #[test]
@@ -105,14 +110,7 @@ mod tests {
 
     #[test]
     fn parameter_shift_matches_analytical_gradient() {
-        let angles = [
-            0.0,
-            0.3,
-            1.0,
-            std::f64::consts::FRAC_PI_2,
-            std::f64::consts::PI,
-            4.7,
-        ];
+        let angles = [0.0, 0.3, 1.0, std::f64::consts::FRAC_PI_2, PI, 4.7];
 
         for theta in angles {
             let expected = -theta.sin();
@@ -124,7 +122,7 @@ mod tests {
 
     #[test]
     fn parameter_shift_gradient_at_minimum_is_zero() {
-        let theta = std::f64::consts::PI;
+        let theta = PI;
 
         let gradient = parameter_shift_gradient(theta);
 
@@ -136,7 +134,7 @@ mod tests {
         let result = optimize_gradient_descent(1.0, 0.2, 100);
 
         assert!((result.energy + 1.0).abs() < 1e-10);
-        assert!((result.theta - std::f64::consts::PI).abs() < 1e-5);
+        assert!((result.theta - PI).abs() < 1e-5);
     }
 
     #[test]

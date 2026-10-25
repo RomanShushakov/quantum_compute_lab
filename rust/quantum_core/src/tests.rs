@@ -2,6 +2,7 @@
 use num_complex::Complex64;
 use rand::SeedableRng;
 use rand::rngs::StdRng;
+use std::f64::consts::PI;
 
 // internal import
 use crate::Qubit;
@@ -266,7 +267,7 @@ fn rotation_y_zero_is_identity() {
 fn rotation_y_pi_flips_zero_to_one() {
     let mut state = StateVector::zero(1);
 
-    state.rotation_y(0, std::f64::consts::PI);
+    state.rotation_y(0, PI);
 
     let probabilities = state.probabilities();
 
@@ -340,7 +341,7 @@ fn expectation_z_matches_rotation_y_cosine() {
         0.0,
         std::f64::consts::FRAC_PI_4,
         std::f64::consts::FRAC_PI_2,
-        std::f64::consts::PI,
+        PI,
         1.7,
     ];
 
