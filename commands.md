@@ -350,7 +350,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo run -p quantum_cpu
 ```
 
-Previously verified: **64 tests passed** (36 in `quantum_core`, 28 in
+Verified: **64 tests passed** (36 in `quantum_core`, 28 in
 `quantum_cpu`), zero failures, and no Clippy warnings.
 
 `quantum_core/src/tests.rs` contains the core unit tests.
@@ -503,32 +503,58 @@ python experiments/07_interacting_vqe/verify_isa_local.py \
 
 
 
-## Rust test module refactor
+## Experiment 09 - Bathe VQE QPU diagnostics
 
-Apply the ZIP at the repository root, retaining existing Cargo manifests
-and other experiment files. The refactor reorganizes the existing 69
-unit tests without changing production behavior. Delete the obsolete
-`rust/quantum_core/src/tests.rs` after applying the ZIP.
+All commands below run from the repository root in the Python venv.
+Commands without `--submit` do not submit QPU jobs.
 
 ```bash
-cd ~/workdir/quantum_compute_lab/rust
-cargo fmt --all
-cargo check --workspace
-cargo test --workspace
-cargo clippy --workspace --all-targets -- -D warnings
-cargo run -p quantum_cpu
+# Inspect existing job without submitting another one.
+python experiments/09_bathe_vqe_qpu/diagnose.py
+
+# Rank connected physical pairs by backend calibration estimates.
+python experiments/09_bathe_vqe_qpu/calibrate.py --list-pairs
+
+# Dry-run basis calibration on the selected pair.
+python experiments/09_bathe_vqe_qpu/calibrate.py --physical-qubits 88 89
+
+# Submit four computational-basis calibration circuits.
+python experiments/09_bathe_vqe_qpu/calibrate.py \
+  --physical-qubits 88 89 --submit --shots 4096
+
+# Validate five VQE ISA circuits without QPU submission.
+python experiments/09_bathe_vqe_qpu/main.py \
+  --backend ibm_kingston --physical-qubits 88 89
+
+# Submit the fixed-angle VQE circuit measurement groups.
+python experiments/09_bathe_vqe_qpu/main.py \
+  --backend ibm_kingston --physical-qubits 88 89 --submit --shots 4096
+
+# Validate Bell-state XX, YY, ZZ measurements locally.
+python experiments/09_bathe_vqe_qpu/bell_state.py \
+  --backend ibm_kingston --physical-qubits 88 89
+
+# Submit Bell-state correlations after dry-run validation.
+python experiments/09_bathe_vqe_qpu/bell_state.py \
+  --backend ibm_kingston --physical-qubits 88 89 --submit --shots 4096
 ```
 
-Expected test totals: 36 in `quantum_core`, 33 in `quantum_cpu`.
+Historical IBM Kingston jobs (2026-10-25):
 
-## Experiment 07 - Offline ISA check
-
-```bash
-cd ~/workdir/quantum_compute_lab
-source venv/bin/activate
-python experiments/07_interacting_vqe/verify_isa_local.py \
-  results/07_interacting_vqe/20261025T153427_754798Z_completed.json
+```text
+Original VQE [0, 1]:     dbf31c7sstms73fd1hgg, energy 6.672486800770
+Calibration [0, 1]:     dbf36afpc3tc739mluh0
+Calibration [88, 89]:   dbf3aungdj9s73fmp73g
+VQE [88, 89]:           dbf3cs7gdj9s73fmpa10, energy 1.073026699181
+Bell [88, 89]:          dbf3g6om94ac738sps30, XX=+0.978516, YY=-0.952637, ZZ=+0.959961
+Ideal reference:        0.724456493728
 ```
 
-The saved circuits passed the ideal ISA verification; this command
-does not connect to IBM or submit a job.
+Results are saved in `results/09_bathe_vqe_qpu/calibration/`,
+`results/09_bathe_vqe_qpu/vqe/`, and
+`results/09_bathe_vqe_qpu/bell_state/`.
+
+The Bell job used 4096 shots per basis. Its first submission attempt failed
+during IBM Cloud IAM connection setup (`Connection reset by peer`); a
+second attempt completed successfully. The earlier failure did not return
+a job ID and is not evidence of an invalid API key.

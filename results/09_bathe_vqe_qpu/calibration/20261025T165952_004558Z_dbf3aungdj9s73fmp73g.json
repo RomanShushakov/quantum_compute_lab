@@ -1,0 +1,101 @@
+{
+  "experiment": "09_bathe_vqe_qpu_computational_basis_calibration",
+  "timestamp_utc": "2026-10-25T16:59:52.004558+00:00",
+  "backend": "ibm_kingston",
+  "job_id": "dbf3aungdj9s73fmp73g",
+  "physical_qubits": [
+    88,
+    89
+  ],
+  "shots_requested_per_state": 4096,
+  "results": [
+    {
+      "prepared": "00",
+      "counts": {
+        "00": 4083,
+        "01": 5,
+        "10": 8
+      },
+      "shots": 4096,
+      "correct_probability": 0.996826171875,
+      "p_c0_one": 0.001220703125,
+      "p_c1_one": 0.001953125,
+      "physical_to_classical": [
+        [
+          88,
+          0
+        ],
+        [
+          89,
+          1
+        ]
+      ]
+    },
+    {
+      "prepared": "01",
+      "counts": {
+        "01": 4062,
+        "00": 29,
+        "11": 5
+      },
+      "shots": 4096,
+      "correct_probability": 0.99169921875,
+      "p_c0_one": 0.992919921875,
+      "p_c1_one": 0.001220703125,
+      "physical_to_classical": [
+        [
+          88,
+          0
+        ],
+        [
+          89,
+          1
+        ]
+      ]
+    },
+    {
+      "prepared": "10",
+      "counts": {
+        "10": 4070,
+        "00": 23,
+        "11": 3
+      },
+      "shots": 4096,
+      "correct_probability": 0.99365234375,
+      "p_c0_one": 0.000732421875,
+      "p_c1_one": 0.994384765625,
+      "physical_to_classical": [
+        [
+          88,
+          0
+        ],
+        [
+          89,
+          1
+        ]
+      ]
+    },
+    {
+      "prepared": "11",
+      "counts": {
+        "11": 4049,
+        "10": 27,
+        "01": 20
+      },
+      "shots": 4096,
+      "correct_probability": 0.988525390625,
+      "p_c0_one": 0.993408203125,
+      "p_c1_one": 0.9951171875,
+      "physical_to_classical": [
+        [
+          88,
+          0
+        ],
+        [
+          89,
+          1
+        ]
+      ]
+    }
+  ]
+}

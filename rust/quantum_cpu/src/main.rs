@@ -2,7 +2,9 @@
 use rand::{SeedableRng, rngs::StdRng};
 
 // mods
+mod bathe_hamiltonian;
 mod bathe_iteration;
+mod bathe_vqe;
 mod bernstein_vazirani;
 mod jacobi;
 mod vqe;
@@ -265,5 +267,37 @@ fn main() {
     println!(
         "  Rayleigh quotient after 2 iterations: {:.12}",
         forward.rayleigh_quotient
+    );
+
+    println!("\nExperiment 08 - Bathe two-qubit Hamiltonian preparation");
+    let h = bathe_hamiltonian::padded_hamiltonian();
+    for row in &h {
+        println!("  {row:?}");
+    }
+    println!("Pauli decomposition (qubit order: most significant first):");
+    let coefficients = bathe_hamiltonian::pauli_coefficients(&h);
+    for (label, coefficient) in bathe_hamiltonian::PAULI_LABELS.iter().zip(coefficients) {
+        println!("  {label}: {coefficient:.12}");
+    }
+    let reconstructed = bathe_hamiltonian::reconstruct_from_paulis(&coefficients);
+    let max_reconstruction_error = (0..4)
+        .flat_map(|i| (0..4).map(move |j| (i, j)))
+        .map(|(i, j)| (h[i][j] - reconstructed[i][j]).abs())
+        .fold(0.0_f64, f64::max);
+    println!("Pauli reconstruction max error: {max_reconstruction_error:.3e}");
+    println!("Reference ground energy: 0.724456494");
+
+    println!("\nExperiment 08 - Bathe two-qubit VQE (noiseless Rust statevector)");
+    let vqe_result = bathe_vqe::optimize();
+    println!("  Optimal angles: {:?}", vqe_result.angles);
+    println!("  Optimized energy: {:.12}", vqe_result.energy);
+    let verified_energy = bathe_vqe::energy(vqe_result.angles);
+    println!("  Re-evaluated energy: {:.12}", verified_energy);
+    assert!((verified_energy - vqe_result.energy).abs() < 1e-10);
+    println!("  Reference energy: 0.724456494");
+    println!("  Coordinate-descent sweeps: {}", vqe_result.sweeps);
+    println!(
+        "  Padding |11> probability: {:.12}",
+        vqe_result.padding_probability
     );
 }

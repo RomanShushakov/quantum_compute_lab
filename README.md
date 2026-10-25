@@ -59,9 +59,6 @@ Non-diagonal VQE and classical Jacobi comparison (complete)
 Bathe Exercise 11.1 and numerical validation (complete)
     |
     v
-Interacting VQE: Aer, IBM QPU, offline ISA verification (complete)
-    |
-    v
 Rust + ash + Vulkan compute simulation (planned)
 ```
 
@@ -867,7 +864,8 @@ The workspace contains `quantum_core` (library) and `quantum_cpu`
 (executable). `rand` is declared under `[workspace.dependencies]` and used
 by both crates; `quantum_core` also uses `num-complex`.
 
-Current suite: **36 `quantum_core` tests + 33 `quantum_cpu` tests = 69 tests**. Run `cargo test --workspace` after applying this refactor to verify. `cargo check` and Clippy with warnings denied completed cleanly.
+Verified locally: **36 `quantum_core` tests + 28 `quantum_cpu` tests = 64
+passed**. `cargo check` and Clippy with warnings denied completed cleanly.
 The tests cover state preparation, gates, normalization, measurement,
 Bernstein-Vazirani, rotations, Pauli expectations, diagonal and interacting
 VQE, generalized Jacobi, residuals, mass orthonormality, and fidelity.
@@ -922,6 +920,27 @@ It covers column and row vectors, transpose and conjugate transpose,
 inner and outer products, Kronecker/tensor products, matrix-vector
 products, matrix-matrix products, and the Bell-state representation.
 
+## Experiment 09 - Bathe VQE on IBM QPU
+
+The fixed two-qubit Bathe VQE state from Experiment 08 was evaluated on
+IBM Kingston. The ideal energy is `0.724456493728`. The first hardware
+mapping `[0, 1]` produced `6.672486800770`; a four-state computational
+basis calibration exposed a strong measurement bias on physical qubit 0.
+After selecting and calibrating pair `[88, 89]`, the same circuit produced
+`1.073026699181` (4096 shots per basis), reducing absolute energy error
+by about 94.1%. Remaining systematic errors are not yet isolated.
+
+Experiment 09 includes dry-run ISA validation, read-only job diagnosis,
+physical-pair ranking and calibration, fixed-angle VQE execution, and a
+Bell-state correlation diagnostic (XX, YY, ZZ). The Bell hardware job
+`dbf3g6om94ac738sps30` on `[88, 89]` measured correlations
+`XX=+0.978516`, `YY=-0.952637`, and `ZZ=+0.959961` with 4096 shots
+per basis. These results support successful entangled-state preparation,
+while remaining deviations do not isolate individual hardware errors.
+Source and commands are described in
+`docs/09_bathe_vqe_qpu.md` and `commands.md`; JSON output belongs under
+`results/09_bathe_vqe_qpu/{calibration,vqe,bell_state}/`.
+
 ## Repository structure
 
 ``` text
@@ -962,11 +981,7 @@ quantum_compute_lab/
       Cargo.toml
       src/
         lib.rs
-        tests/
-          mod.rs
-          gates.rs
-          measurements.rs
-          statevector.rs
+        tests.rs
     quantum_cpu/
       Cargo.toml
       src/
@@ -976,12 +991,6 @@ quantum_compute_lab/
         vqe_two_qubit.rs
         vqe_interacting.rs
         jacobi.rs
-        tests/
-          vqe.rs
-          vqe_interacting.rs
-          vqe_two_qubit.rs
-          jacobi.rs
-          bernstein_vazirani.rs
   README.md
   commands.md
   requirements.txt
@@ -990,24 +999,3 @@ quantum_compute_lab/
 `commands.md` records the commands used while building and running the
 experiments. The JSON results are intended for future offline analysis
 and Rust CPU/Vulkan simulator comparisons.
-
-## Experiment 07 - Interacting VQE (complete)
-
-For `H = Z0 + Z1 + 0.5 X0X1`, the exact minimum is
-`-sqrt(17)/2 = -2.061552812809`. Rust VQE, Jacobi and exact Qiskit
-Aer agree. A 10,000-shot ideal Aer sample estimated `-2.0594`; the
-recorded 10,000-shot IBM Kingston result was `-1.1575`.
-
-Offline verification of the saved ISA circuits reproduces the exact
-expectations `Z0 = Z1 = -0.970142500077` and `XX = -0.242535625311`.
-This confirms ideal transpiled-circuit semantics, but does not isolate
-the physical source of the IBM measurement discrepancy. No additional
-QPU job is required.
-
-## Rust unit-test layout
-
-The 69 tests are grouped into `src/tests/` modules under each crate.
-They remain unit tests, not Cargo integration tests. Implementations
-and public APIs are unchanged. Run `cargo fmt --all -- --check`,
-`cargo test --workspace` and
-`cargo clippy --workspace --all-targets -- -D warnings` to verify.

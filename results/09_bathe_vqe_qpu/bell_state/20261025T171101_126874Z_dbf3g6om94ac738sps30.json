@@ -1,0 +1,82 @@
+{
+  "experiment": "09_bathe_vqe_qpu_bell_state",
+  "timestamp_utc": "2026-10-25T17:11:01.126874+00:00",
+  "backend": "ibm_kingston",
+  "job_id": "dbf3g6om94ac738sps30",
+  "physical_qubits": [
+    88,
+    89
+  ],
+  "shots_requested_per_basis": 4096,
+  "results": [
+    {
+      "basis": "XX",
+      "counts": {
+        "00": 2047,
+        "11": 2005,
+        "01": 19,
+        "10": 25
+      },
+      "shots": 4096,
+      "physical_to_classical": [
+        [
+          88,
+          0
+        ],
+        [
+          89,
+          1
+        ]
+      ],
+      "ideal_correlation": 1.0,
+      "qpu_correlation": 0.978515625,
+      "shot_only_standard_error": 0.0032218413512334143
+    },
+    {
+      "basis": "YY",
+      "counts": {
+        "10": 1926,
+        "01": 2073,
+        "00": 73,
+        "11": 24
+      },
+      "shots": 4096,
+      "physical_to_classical": [
+        [
+          88,
+          0
+        ],
+        [
+          89,
+          1
+        ]
+      ],
+      "ideal_correlation": -1.0,
+      "qpu_correlation": -0.95263671875,
+      "shot_only_standard_error": 0.004752308919949424
+    },
+    {
+      "basis": "ZZ",
+      "counts": {
+        "11": 1909,
+        "00": 2105,
+        "10": 44,
+        "01": 38
+      },
+      "shots": 4096,
+      "physical_to_classical": [
+        [
+          88,
+          0
+        ],
+        [
+          89,
+          1
+        ]
+      ],
+      "ideal_correlation": 1.0,
+      "qpu_correlation": 0.9599609375,
+      "shot_only_standard_error": 0.004377626501997876
+    }
+  ]
+}
