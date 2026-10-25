@@ -2,6 +2,7 @@
 use rand::{SeedableRng, rngs::StdRng};
 
 // mods
+mod bathe_iteration;
 mod bernstein_vazirani;
 mod jacobi;
 mod vqe;
@@ -231,4 +232,38 @@ fn main() {
         }
         println!();
     }
+
+    println!();
+    println!("Bathe Exercise 11.1 - Two vector iterations");
+
+    let inverse = bathe_iteration::inverse_two_iterations();
+    let forward = bathe_iteration::forward_two_iterations();
+
+    println!("Inverse iteration (smallest eigenvalue):");
+    println!("  x2 = {:?}", inverse.first);
+    println!("  x3 = {:?}", inverse.second);
+    println!(
+        "  Rayleigh quotient after 2 iterations: {:.12}",
+        inverse.rayleigh_quotient
+    );
+
+    println!("Forward iteration history (Bathe Exercise 11.1):");
+    for (index, (vector, quotient)) in bathe_iteration::forward_iterations(7).iter().enumerate() {
+        println!(
+            "  iteration {} (x{}): x = {:?}, Rayleigh = {:.9}",
+            index + 1,
+            index + 2,
+            vector,
+            quotient
+        );
+    }
+    println!("  Jacobi reference lambda_3: 9.310363643");
+
+    println!("Forward iteration (largest eigenvalue):");
+    println!("  x2 = {:?}", forward.first);
+    println!("  x3 = {:?}", forward.second);
+    println!(
+        "  Rayleigh quotient after 2 iterations: {:.12}",
+        forward.rayleigh_quotient
+    );
 }
