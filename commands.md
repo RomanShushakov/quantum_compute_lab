@@ -317,9 +317,9 @@ ls -lh results/06_bernstein_vazirani/
 jq . results/06_bernstein_vazirani/*.json
 ```
 
-## Rust milestone 01 - Single-qubit state vector (complete)
+## Rust CPU simulator - completed milestones
 
-From the repository root, the Rust workspace was created with:
+The Rust workspace was initially created from the repository root:
 
 ```bash
 mkdir -p rust
@@ -328,36 +328,72 @@ cargo new quantum_core --lib
 cargo new quantum_cpu --bin
 ```
 
-The `rust/Cargo.toml` workspace lists both crates. `quantum_core` depends on
-`num-complex = "0.4"`; `quantum_cpu` uses the local `quantum_core` crate.
+The workspace contains a library (`quantum_core`) and executable
+(`quantum_cpu`). The library implements the original one-qubit example,
+plus multi-qubit state vectors, H/X/Z/CNOT gates, probabilities, and
+measurement sampling. The executable demonstrates Bell-state preparation
+and Bernstein-Vazirani with secret `1011`.
 
-Verify formatting, compilation, and the single-qubit executable:
+The `rand` dependency is centralized in `rust/Cargo.toml` under
+`[workspace.dependencies]` and referenced by both crates with
+`rand = { workspace = true }`. `quantum_core` also uses `num-complex`.
+
+### Build and verification
+
+From the Rust workspace directory:
 
 ```bash
 cd ~/workdir/quantum_compute_lab/rust
 cargo fmt --all
 cargo check --workspace
+cargo test --workspace
+cargo clippy --workspace --all-targets -- -D warnings
 cargo run -p quantum_cpu
 ```
 
-The executable prints the `|0>` state, the equal-probability state after
-Hadamard, and the restored `|0>` state after a second Hadamard.
+Verified: **21 tests passed** (19 in `quantum_core`, 2 in
+`quantum_cpu`), zero failures, and no Clippy warnings.
 
-Run the four verified mathematical unit tests:
+`quantum_core/src/tests.rs` contains the core unit tests.
+`quantum_cpu/src/bernstein_vazirani.rs` contains the Bernstein-Vazirani
+implementation and its two tests, including a test of all 16 possible
+four-bit secrets.
 
-```bash
-cargo test --workspace
+### Bell-state output
+
+`cargo run -p quantum_cpu` prepares `(|00> + |11>) / sqrt(2)` and
+samples the resulting distribution using 1000 shots and seed 42:
+
+```text
+Measurement results (1000 shots):
+|00>: 492
+|01>: 0
+|10>: 0
+|11>: 508
 ```
 
-Observed result: **4 passed, 0 failed** in `quantum_core`.
-The tests cover initialization, equal Hadamard probabilities, `H^2 = I`,
-and normalization under 100 repeated Hadamard applications.
+These are ideal-simulator samples, not physical QPU measurements.
 
-## Next - Multi-qubit Rust state vectors and Vulkan simulation
+### Bernstein-Vazirani output
 
-Begin with a Rust CPU state-vector implementation of single-qubit gates,
-then Bell states and Bernstein-Vazirani. Validate against mathematical
-expectations and saved Qiskit Aer results. Later implement the same
-operations on the local GPU using Rust `ash` and Vulkan compute.
-No new IBM jobs are required for this phase.
+The same executable prepares a five-qubit Bernstein-Vazirani circuit:
+four input qubits and one auxiliary qubit. The oracle represents the
+secret `1011`; the auxiliary bit is discarded from the reported outcome.
 
+```text
+Bernstein-Vazirani experiment
+Secret: 1011
+1011: 1000
+```
+
+For historical comparisons, see Experiment 06 above: Qiskit Aer also
+returned `1011` in all 1000 shots; the recorded IBM QPU returned it in
+879 of 1000 shots.
+
+## Next - Applied quantum algorithms and numerical reference
+
+Continue locally with a small VQE example and a classical eigenvalue
+reference, then investigate relevant examples and Fortran routines from
+Bathe's *Finite Element Procedures*. Existing Rust numerical solvers may
+be consulted without requiring integration. A later phase will explore
+Rust `ash`/Vulkan compute on the laptop. No new IBM QPU jobs are required.

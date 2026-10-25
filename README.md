@@ -6,9 +6,11 @@ principles.
 The lab focuses on understanding quantum-computing concepts through
 executable examples rather than only theory. The initial experiments use
 Python and Qiskit, including local simulation and later execution on IBM
-Quantum hardware. After the initial Qiskit and IBM hardware experiments, the lab will
-implement local quantum simulation in Rust, first on the CPU and then
-using Vulkan compute through `ash` on the same development machine.
+Quantum hardware. After the initial Qiskit and IBM hardware experiments, the lab implements
+local quantum simulation in Rust. The CPU simulator now supports Bell-state
+and Bernstein-Vazirani experiments; later work will explore applied quantum
+algorithms, classical numerical comparisons, and Vulkan compute via `ash`
+on the same development machine.
 
 ## Approach
 
@@ -43,10 +45,16 @@ noise and hardware constraints
 Bernstein-Vazirani algorithm on a QPU (complete)
     |
     v
-Rust CPU state-vector simulation
+Rust CPU state-vector simulation (Bell and Bernstein-Vazirani complete)
     |
     v
-Rust + ash + Vulkan compute simulation
+Applied quantum algorithms (VQE) and classical eigenvalue comparison
+    |
+    v
+Bathe numerical examples and Fortran solver references
+    |
+    v
+Rust + ash + Vulkan compute simulation (planned)
 ```
 
 ## Experiments
@@ -594,8 +602,9 @@ IBM job ID; use the submission record and recorded job metadata to link
 artifacts. The script runs locally by default and submits to the QPU
 only when explicitly passed `--submit`.
 
-The next phase is implementing quantum state-vector simulation in Rust,
-starting with a CPU reference and later using Vulkan compute via `ash`.
+The next phase builds on the completed Rust CPU state-vector simulator:
+apply quantum algorithms to numerical problems, compare against classical
+solvers, and later investigate Vulkan compute via `ash`.
 
 
 ## JSON experiment results
@@ -654,74 +663,119 @@ simulator. For reproducible comparisons, retain circuit definitions,
 qubit/bit ordering, backend mapping, shots, noise-model configuration,
 software versions and random seeds where available.
 
-## Rust CPU simulator - milestone 01 (complete)
+## Rust CPU simulator - milestones 01-04 (complete)
 
-The first Rust milestone reproduces Experiment 01 without Qiskit or a
-quantum simulation library. The workspace currently contains:
+The Rust workspace implements a local ideal quantum state-vector simulator
+without Qiskit or an external quantum simulation engine:
 
-- `quantum_core`: a `Qubit` with two `num_complex::Complex64` amplitudes,
-  initialization to `|0>`, an in-place Hadamard operation, and probabilities
-  computed with `norm_sqr()`.
-- `quantum_cpu`: a small executable that prints amplitudes and probabilities
-  before and after one and two Hadamard gates.
+- `quantum_core`: the original `Qubit` demonstration and a multi-qubit
+  `StateVector` using `num_complex::Complex64` amplitudes.
+- `StateVector::zero(n)` initializes `|00...0>` with `2^n` amplitudes.
+- In-place gates: Hadamard (`hadamard`), Pauli-X (`pauli_x`), Pauli-Z
+  (`pauli_z`), and controlled-NOT (`cnot`).
+- `probabilities()` computes squared amplitude magnitudes; `sample()`
+  samples a computational-basis outcome using a supplied random generator.
+  Sampling does not collapse or mutate the stored state.
+- `quantum_cpu`: executable demonstrations of Bell-state preparation,
+  amplitudes, probabilities, 1000 measurement shots, and the
+  Bernstein-Vazirani algorithm with secret `1011`.
 
-For a qubit `|psi> = alpha|0> + beta|1>`, the Hadamard implementation updates
-its amplitudes as:
+The simulator uses little-endian qubit indexing: qubit 0 is the
+least-significant bit of the basis-state index, matching the convention
+used in the Qiskit experiments. Elementary gates update amplitude pairs
+or signs directly rather than constructing full `2^n x 2^n` matrices.
+
+### Verified Rust results
+
+Bell-state circuit: `H(0)` followed by `CNOT(0, 1)`:
 
 ```text
-alpha' = (alpha + beta) / sqrt(2)
-beta'  = (alpha - beta) / sqrt(2)
-P(0)   = |alpha|^2
-P(1)   = |beta|^2
+(|00> + |11>) / sqrt(2)
+
+1000 shots (seed 42):
+00: 492
+01: 0
+10: 0
+11: 508
 ```
 
-Verified output on the laptop (WSL2 Ubuntu):
+Bernstein-Vazirani: four input qubits, one auxiliary qubit, and an oracle
+using CNOT controls on input qubits 0, 1, and 3:
 
-| Stage | P(0) | P(1) |
-| --- | ---: | ---: |
-| Initial `|0>` | 1.000000 | 0.000000 |
-| After `H` | 0.500000 | 0.500000 |
-| After `H` twice | 1.000000 | 0.000000 |
+```text
+Secret: 1011
+1011: 1000
+```
 
-After two Hadamards, the first amplitude was
-`0.9999999999999998 + 0i`; the small deviation from 1 is ordinary
-floating-point rounding. This milestone computes exact state-vector
-probabilities (subject to floating-point precision), not random measurement
-samples.
+The input register is recovered with 100% success in this ideal simulation.
+The auxiliary qubit is not included in the displayed four-bit measurement.
+The oracle is explicitly constructed from the known secret; this is an
+algorithm demonstration, not a claim of classical simulation speedup.
 
-Four unit tests in `quantum_core` passed:
+| Experiment | Qiskit Aer | Rust CPU | Recorded IBM QPU |
+| --- | --- | --- | --- |
+| Bell state, 1000 shots | `00=489, 11=511` | `00=492, 11=508` | `00=481, 01=31, 10=37, 11=451` |
+| Bernstein-Vazirani `1011` | `1011=1000` | `1011=1000` | `1011=879` (87.9%) |
 
-1. `initial_state_is_zero`
-2. `hadamard_creates_equal_probabilities`
-3. `hadamard_twice_is_identity`
-4. `state_remains_normalized` (100 successive Hadamard applications)
+The Bell-state reference above uses the saved Experiment 04 dataset.
+Finite-shot counts from ideal simulators can differ even when they model
+the same state. The IBM results are historical physical-hardware samples,
+not targets for an ideal simulator to reproduce exactly.
 
-The verified command `cargo test --workspace` reported four passing tests,
-zero failures. The next Rust step is a general `StateVector` for multiple
-qubits, followed by Bell-state preparation and controlled gates. This will
-establish the amplitude-pair indexing needed for the later Vulkan backend.
+### Workspace, tests and dependencies
 
-## Rust and Vulkan simulator roadmap
+The workspace has `quantum_core` (library) and `quantum_cpu` (executable).
+The `rand` version is declared under `[workspace.dependencies]` and opted
+into by both crates using `rand = { workspace = true }`. The `quantum_core`
+unit tests are in `src/tests.rs`; the Bernstein-Vazirani tests are alongside
+the experiment in `quantum_cpu/src/bernstein_vazirani.rs`.
 
-With experiments 01-06 complete, develop a local simulator in
-stages:
+Verified on the laptop:
 
-1. Rust CPU state-vector simulator: complex amplitudes, initialization,
-   single-qubit gates, controlled gates, measurement and sampling.
-2. Verify state vectors, probabilities and circuits against theory and
-   Qiskit Aer, including Bell states and phase-sensitive circuits.
-3. Rust Vulkan compute backend using `ash`, storage buffers, descriptors,
-   command buffers, compute pipelines and SPIR-V shaders.
-4. Implement parallel amplitude-pair updates without constructing full
-   `2^n x 2^n` matrices for elementary gates.
-5. Compare CPU and Vulkan correctness, precision, runtime, memory use,
-   transfer overhead and scaling with qubit count.
+```bash
+cd ~/workdir/quantum_compute_lab/rust
+cargo fmt --all
+cargo check --workspace
+cargo test --workspace
+cargo clippy --workspace --all-targets -- -D warnings
+cargo run -p quantum_cpu
+```
+
+Result: **19 `quantum_core` tests + 2 `quantum_cpu` tests = 21 passed**;
+Clippy completed without warnings. Tests cover state initialization,
+normalization, H/X/Z/CNOT behavior, phase interference, sampling, and
+recovery of all 16 possible four-bit Bernstein-Vazirani secrets.
+
+The original single-qubit `Qubit` remains as an introductory example;
+`StateVector` is the multi-qubit implementation used by the newer circuits.
+
+## Applied quantum algorithms and numerical computing roadmap
+
+The next objective is to test quantum algorithms on meaningful numerical
+problems, not merely reproduce quantum circuits:
+
+1. Implement a small local Variational Quantum Eigensolver (VQE), starting
+   with a Hamiltonian whose lowest eigenvalue can be checked analytically
+   and with a classical Rust eigensolver.
+2. Investigate eigenvalue examples from Klaus-Juergen Bathe's *Finite
+   Element Procedures*, using accompanying Fortran routines such as
+   `JACOBI.FOR` and `SSPACE.FOR` as algorithm references where suitable.
+3. Evaluate whether any of the user's existing Rust numerical projects
+   (`colsol`, `iterative_solvers`, `extended_matrix`) are useful references
+   or reusable components. Integration is optional, not a prerequisite.
+4. Develop a Rust Vulkan compute backend using `ash`, with suitable
+   amplitude-update and numerical kernels, then compare CPU/GPU accuracy,
+   performance, memory usage, and data-transfer overhead.
+
+A classical eigensolver and a quantum eigensolver are different algorithms;
+solving a FEM eigenproblem does not automatically imply a quantum speedup.
+Local VQE experiments simulate quantum circuits on a classical computer;
+they do not require IBM Quantum access or demonstrate quantum advantage.
 
 All GPU work is planned for the local development machine using Vulkan
 through `ash`; Jetson, Slurm and WebGPU are not part of this plan.
-Classical state-vector simulation still requires exponentially growing
-storage in the general case (`2^n` complex amplitudes). GPU acceleration
-does not remove that fundamental constraint.
+Classical state-vector simulation requires `2^n` complex amplitudes in
+the general case. GPU acceleration does not remove that storage cost.
 
 ## Linear algebra reference
 
@@ -775,10 +829,12 @@ quantum_compute_lab/
       Cargo.toml
       src/
         lib.rs
+        tests.rs
     quantum_cpu/
       Cargo.toml
       src/
         main.rs
+        bernstein_vazirani.rs
   README.md
   commands.md
   requirements.txt

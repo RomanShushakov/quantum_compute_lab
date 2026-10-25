@@ -1,4 +1,9 @@
+// external imports
 use num_complex::Complex64;
+use rand::{Rng, RngExt};
+
+#[cfg(test)]
+mod tests;
 
 pub struct Qubit {
     pub amplitudes: [Complex64; 2],
@@ -26,58 +31,114 @@ impl Qubit {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub struct StateVector {
+    pub num_qubits: usize,
+    pub amplitudes: Vec<Complex64>,
+}
 
-    const EPSILON: f64 = 1e-12;
+impl StateVector {
+    pub fn zero(num_qubits: usize) -> Self {
+        assert!(num_qubits > 0, "num_qubits must be positive");
 
-    fn approx_equal(a: f64, b: f64) -> bool {
-        (a - b).abs() < EPSILON
-    }
+        let num_states = 1usize
+            .checked_shl(num_qubits as u32)
+            .expect("too many qubits");
 
-    #[test]
-    fn initial_state_is_zero() {
-        let qubit = Qubit::zero();
+        let mut amplitudes = vec![Complex64::new(0.0, 0.0); num_states];
 
-        assert_eq!(qubit.probabilities(), [1.0, 0.0]);
-    }
+        amplitudes[0] = Complex64::new(1.0, 0.0);
 
-    #[test]
-    fn hadamard_creates_equal_probabilities() {
-        let mut qubit = Qubit::zero();
-
-        qubit.hadamard();
-
-        let probabilities = qubit.probabilities();
-
-        assert!(approx_equal(probabilities[0], 0.5));
-        assert!(approx_equal(probabilities[1], 0.5));
-    }
-
-    #[test]
-    fn hadamard_twice_is_identity() {
-        let mut qubit = Qubit::zero();
-
-        qubit.hadamard();
-        qubit.hadamard();
-
-        assert!(approx_equal(qubit.amplitudes[0].re, 1.0));
-        assert!(approx_equal(qubit.amplitudes[0].im, 0.0));
-        assert!(approx_equal(qubit.amplitudes[1].re, 0.0));
-        assert!(approx_equal(qubit.amplitudes[1].im, 0.0));
-    }
-
-    #[test]
-    fn state_remains_normalized() {
-        let mut qubit = Qubit::zero();
-
-        for _ in 0..100 {
-            qubit.hadamard();
-
-            let total: f64 = qubit.probabilities().iter().sum();
-
-            assert!(approx_equal(total, 1.0));
+        Self {
+            num_qubits,
+            amplitudes,
         }
+    }
+
+    pub fn probabilities(&self) -> Vec<f64> {
+        self.amplitudes
+            .iter()
+            .map(|amplitude| amplitude.norm_sqr())
+            .collect()
+    }
+
+    pub fn hadamard(&mut self, target: usize) {
+        assert!(target < self.num_qubits, "invalid target qubit");
+
+        let stride = 1usize << target;
+        let block_size = stride * 2;
+        let factor = 1.0 / 2.0_f64.sqrt();
+
+        for block_start in (0..self.amplitudes.len()).step_by(block_size) {
+            for offset in 0..stride {
+                let i0 = block_start + offset;
+                let i1 = i0 + stride;
+
+                let a = self.amplitudes[i0];
+                let b = self.amplitudes[i1];
+
+                self.amplitudes[i0] = (a + b) * factor;
+                self.amplitudes[i1] = (a - b) * factor;
+            }
+        }
+    }
+
+    pub fn cnot(&mut self, control: usize, target: usize) {
+        assert!(control < self.num_qubits, "invalid control qubit");
+        assert!(target < self.num_qubits, "invalid target qubit");
+        assert_ne!(control, target, "control and target must differ");
+
+        let control_mask = 1usize << control;
+        let target_mask = 1usize << target;
+
+        for index in 0..self.amplitudes.len() {
+            let control_is_one = (index & control_mask) != 0;
+            let target_is_zero = (index & target_mask) == 0;
+
+            if control_is_one && target_is_zero {
+                let flipped_index = index | target_mask;
+                self.amplitudes.swap(index, flipped_index);
+            }
+        }
+    }
+
+    pub fn pauli_x(&mut self, target: usize) {
+        assert!(target < self.num_qubits, "invalid target qubit");
+
+        let target_mask = 1usize << target;
+
+        for index in 0..self.amplitudes.len() {
+            if index & target_mask == 0 {
+                let flipped_index = index | target_mask;
+                self.amplitudes.swap(index, flipped_index);
+            }
+        }
+    }
+
+    pub fn pauli_z(&mut self, target: usize) {
+        assert!(target < self.num_qubits, "invalid target qubit");
+
+        let target_mask = 1usize << target;
+
+        for (index, amplitude) in self.amplitudes.iter_mut().enumerate() {
+            if index & target_mask != 0 {
+                *amplitude = -*amplitude;
+            }
+        }
+    }
+
+    pub fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> usize {
+        let threshold: f64 = rng.random();
+        let mut cumulative_probability = 0.0;
+
+        for (index, amplitude) in self.amplitudes.iter().enumerate() {
+            cumulative_probability += amplitude.norm_sqr();
+
+            if threshold < cumulative_probability {
+                return index;
+            }
+        }
+
+        // Handle small floating-point normalization errors.
+        self.amplitudes.len() - 1
     }
 }
