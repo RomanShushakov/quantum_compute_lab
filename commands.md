@@ -350,7 +350,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo run -p quantum_cpu
 ```
 
-Verified: **64 tests passed** (36 in `quantum_core`, 28 in
+Previously verified: **64 tests passed** (36 in `quantum_core`, 28 in
 `quantum_cpu`), zero failures, and no Clippy warnings.
 
 `quantum_core/src/tests.rs` contains the core unit tests.
@@ -475,3 +475,60 @@ Mass Gram matrix (Phi^T M Phi):
 The full Rust test suite currently passes 64 tests (36 core, 28 CPU),
 with zero Clippy warnings. These commands run locally and do not submit
 IBM QPU jobs.
+
+
+cargo fmt --all
+cargo check --workspace
+cargo test --workspace
+cargo clippy --workspace --all-targets -- -D warnings
+cargo run -p quantum_cpu
+
+
+cd ~/workdir/quantum_compute_lab
+source venv/bin/activate
+
+python experiments/07_interacting_vqe/main.py --shots 10000
+
+
+python experiments/07_interacting_vqe/main.py --help
+
+
+python experiments/07_interacting_vqe/main.py --submit --shots 10000
+
+
+source venv/bin/activate
+
+python experiments/07_interacting_vqe/verify_isa_local.py \
+  results/07_interacting_vqe/20261025T153427_754798Z_completed.json
+
+
+
+## Rust test module refactor
+
+Apply the ZIP at the repository root, retaining existing Cargo manifests
+and other experiment files. The refactor reorganizes the existing 69
+unit tests without changing production behavior. Delete the obsolete
+`rust/quantum_core/src/tests.rs` after applying the ZIP.
+
+```bash
+cd ~/workdir/quantum_compute_lab/rust
+cargo fmt --all
+cargo check --workspace
+cargo test --workspace
+cargo clippy --workspace --all-targets -- -D warnings
+cargo run -p quantum_cpu
+```
+
+Expected test totals: 36 in `quantum_core`, 33 in `quantum_cpu`.
+
+## Experiment 07 - Offline ISA check
+
+```bash
+cd ~/workdir/quantum_compute_lab
+source venv/bin/activate
+python experiments/07_interacting_vqe/verify_isa_local.py \
+  results/07_interacting_vqe/20261025T153427_754798Z_completed.json
+```
+
+The saved circuits passed the ideal ISA verification; this command
+does not connect to IBM or submit a job.

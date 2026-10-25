@@ -114,6 +114,12 @@ fn main() {
     println!("Minimum energy: {:.9}", interacting_result.energy);
     println!("Exact ground energy: {:.9}", -(17.0_f64).sqrt() / 2.0);
 
+    let interacting_gradient_result = vqe_interacting::optimize_gradient_descent(3.0, 0.2, 100);
+
+    println!("\nInteracting VQE - Gradient descent (parameter shift)");
+    println!("Optimal theta: {:.9}", interacting_gradient_result.theta);
+    println!("Minimum energy: {:.12}", interacting_gradient_result.energy);
+
     println!();
     println!("Generalized Jacobi eigenvalue experiment");
 
@@ -173,6 +179,14 @@ fn main() {
     println!(
         "Grid-optimized VQE/Jacobi fidelity: {:.12}",
         optimized_fidelity
+    );
+
+    let gradient_fidelity =
+        vqe_interacting::ground_state_fidelity(interacting_gradient_result.theta, &ground_state);
+
+    println!(
+        "Gradient-optimized VQE/Jacobi fidelity: {:.12}",
+        gradient_fidelity
     );
 
     println!();

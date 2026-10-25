@@ -3,6 +3,7 @@ use num_complex::Complex64;
 use rand::{Rng, RngExt};
 
 #[cfg(test)]
+#[path = "tests/mod.rs"]
 mod tests;
 
 pub struct Qubit {

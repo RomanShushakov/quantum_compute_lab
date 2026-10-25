@@ -59,6 +59,9 @@ Non-diagonal VQE and classical Jacobi comparison (complete)
 Bathe Exercise 11.1 and numerical validation (complete)
     |
     v
+Interacting VQE: Aer, IBM QPU, offline ISA verification (complete)
+    |
+    v
 Rust + ash + Vulkan compute simulation (planned)
 ```
 
@@ -864,8 +867,7 @@ The workspace contains `quantum_core` (library) and `quantum_cpu`
 (executable). `rand` is declared under `[workspace.dependencies]` and used
 by both crates; `quantum_core` also uses `num-complex`.
 
-Verified locally: **36 `quantum_core` tests + 28 `quantum_cpu` tests = 64
-passed**. `cargo check` and Clippy with warnings denied completed cleanly.
+Current suite: **36 `quantum_core` tests + 33 `quantum_cpu` tests = 69 tests**. Run `cargo test --workspace` after applying this refactor to verify. `cargo check` and Clippy with warnings denied completed cleanly.
 The tests cover state preparation, gates, normalization, measurement,
 Bernstein-Vazirani, rotations, Pauli expectations, diagonal and interacting
 VQE, generalized Jacobi, residuals, mass orthonormality, and fidelity.
@@ -960,7 +962,11 @@ quantum_compute_lab/
       Cargo.toml
       src/
         lib.rs
-        tests.rs
+        tests/
+          mod.rs
+          gates.rs
+          measurements.rs
+          statevector.rs
     quantum_cpu/
       Cargo.toml
       src/
@@ -970,6 +976,12 @@ quantum_compute_lab/
         vqe_two_qubit.rs
         vqe_interacting.rs
         jacobi.rs
+        tests/
+          vqe.rs
+          vqe_interacting.rs
+          vqe_two_qubit.rs
+          jacobi.rs
+          bernstein_vazirani.rs
   README.md
   commands.md
   requirements.txt
@@ -978,3 +990,24 @@ quantum_compute_lab/
 `commands.md` records the commands used while building and running the
 experiments. The JSON results are intended for future offline analysis
 and Rust CPU/Vulkan simulator comparisons.
+
+## Experiment 07 - Interacting VQE (complete)
+
+For `H = Z0 + Z1 + 0.5 X0X1`, the exact minimum is
+`-sqrt(17)/2 = -2.061552812809`. Rust VQE, Jacobi and exact Qiskit
+Aer agree. A 10,000-shot ideal Aer sample estimated `-2.0594`; the
+recorded 10,000-shot IBM Kingston result was `-1.1575`.
+
+Offline verification of the saved ISA circuits reproduces the exact
+expectations `Z0 = Z1 = -0.970142500077` and `XX = -0.242535625311`.
+This confirms ideal transpiled-circuit semantics, but does not isolate
+the physical source of the IBM measurement discrepancy. No additional
+QPU job is required.
+
+## Rust unit-test layout
+
+The 69 tests are grouped into `src/tests/` modules under each crate.
+They remain unit tests, not Cargo integration tests. Implementations
+and public APIs are unchanged. Run `cargo fmt --all -- --check`,
+`cargo test --workspace` and
+`cargo clippy --workspace --all-targets -- -D warnings` to verify.
