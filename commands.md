@@ -328,11 +328,10 @@ cargo new quantum_core --lib
 cargo new quantum_cpu --bin
 ```
 
-The workspace contains a library (`quantum_core`) and executable
-(`quantum_cpu`). The library implements the original one-qubit example,
-plus multi-qubit state vectors, H/X/Z/CNOT gates, probabilities, and
-measurement sampling. The executable demonstrates Bell-state preparation
-and Bernstein-Vazirani with secret `1011`.
+The workspace contains `quantum_core` (library) and `quantum_cpu`
+(executable). The library supports state vectors, H/X/Z/CNOT/Ry gates,
+sampling, and Z/ZZ/XX expectations. The executable runs Bell-state,
+Bernstein-Vazirani, and VQE demonstrations.
 
 The `rand` dependency is centralized in `rust/Cargo.toml` under
 `[workspace.dependencies]` and referenced by both crates with
@@ -351,13 +350,13 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo run -p quantum_cpu
 ```
 
-Verified: **21 tests passed** (19 in `quantum_core`, 2 in
+Verified: **50 tests passed** (36 in `quantum_core`, 14 in
 `quantum_cpu`), zero failures, and no Clippy warnings.
 
 `quantum_core/src/tests.rs` contains the core unit tests.
 `quantum_cpu/src/bernstein_vazirani.rs` contains the Bernstein-Vazirani
-implementation and its two tests, including a test of all 16 possible
-four-bit secrets.
+implementation and its tests. `vqe.rs` and `vqe_two_qubit.rs` contain the
+VQE experiments and tests.
 
 ### Bell-state output
 
@@ -390,10 +389,22 @@ For historical comparisons, see Experiment 06 above: Qiskit Aer also
 returned `1011` in all 1000 shots; the recorded IBM QPU returned it in
 879 of 1000 shots.
 
-## Next - Applied quantum algorithms and numerical reference
+## Rust VQE output checks
 
-Continue locally with a small VQE example and a classical eigenvalue
-reference, then investigate relevant examples and Fortran routines from
-Bathe's *Finite Element Procedures*. Existing Rust numerical solvers may
-be consulted without requiring integration. A later phase will explore
-Rust `ash`/Vulkan compute on the laptop. No new IBM QPU jobs are required.
+Run the Rust executable to inspect both VQE examples:
+
+```bash
+cd ~/workdir/quantum_compute_lab/rust
+cargo run -p quantum_cpu
+```
+
+Verified energies: `H = Z` gives `-1.000000` using both grid search and
+gradient descent; `H = Z0 + Z1 + Z0Z1` gives `-1.000000` using a two-angle
+grid search.
+
+## Next - Non-diagonal Hamiltonian
+
+Continue with a non-diagonal two-qubit Hamiltonian and classical Jacobi
+reference. The `XX` expectation is implemented and tested; no non-diagonal
+VQE or Jacobi executable has been added yet. IBM QPU submission is not
+part of the Rust commands above.

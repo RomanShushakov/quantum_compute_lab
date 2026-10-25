@@ -141,4 +141,87 @@ impl StateVector {
         // Handle small floating-point normalization errors.
         self.amplitudes.len() - 1
     }
+
+    pub fn rotation_y(&mut self, target: usize, theta: f64) {
+        assert!(target < self.num_qubits, "invalid target qubit");
+
+        let cosine = (theta / 2.0).cos();
+        let sine = (theta / 2.0).sin();
+
+        let stride = 1usize << target;
+        let block_size = stride * 2;
+
+        for block_start in (0..self.amplitudes.len()).step_by(block_size) {
+            for offset in 0..stride {
+                let i0 = block_start + offset;
+                let i1 = i0 + stride;
+
+                let a = self.amplitudes[i0];
+                let b = self.amplitudes[i1];
+
+                self.amplitudes[i0] = a * cosine - b * sine;
+                self.amplitudes[i1] = a * sine + b * cosine;
+            }
+        }
+    }
+
+    pub fn expectation_z(&self, target: usize) -> f64 {
+        assert!(target < self.num_qubits, "invalid target qubit");
+
+        let target_mask = 1usize << target;
+
+        self.amplitudes
+            .iter()
+            .enumerate()
+            .map(|(index, amplitude)| {
+                let probability = amplitude.norm_sqr();
+
+                if index & target_mask == 0 {
+                    probability
+                } else {
+                    -probability
+                }
+            })
+            .sum()
+    }
+
+    pub fn expectation_zz(&self, qubit_a: usize, qubit_b: usize) -> f64 {
+        assert!(qubit_a < self.num_qubits, "invalid first qubit");
+        assert!(qubit_b < self.num_qubits, "invalid second qubit");
+        assert_ne!(qubit_a, qubit_b, "qubits must differ");
+
+        let mask_a = 1usize << qubit_a;
+        let mask_b = 1usize << qubit_b;
+
+        self.amplitudes
+            .iter()
+            .enumerate()
+            .map(|(index, amplitude)| {
+                let bit_a = index & mask_a != 0;
+                let bit_b = index & mask_b != 0;
+
+                let probability = amplitude.norm_sqr();
+
+                if bit_a == bit_b {
+                    probability
+                } else {
+                    -probability
+                }
+            })
+            .sum()
+    }
+
+    pub fn expectation_xx(&self, qubit_a: usize, qubit_b: usize) -> f64 {
+        assert!(qubit_a < self.num_qubits, "invalid first qubit");
+        assert!(qubit_b < self.num_qubits, "invalid second qubit");
+        assert_ne!(qubit_a, qubit_b, "qubits must differ");
+
+        let flip_mask = (1usize << qubit_a) | (1usize << qubit_b);
+
+        self.amplitudes
+            .iter()
+            .enumerate()
+            .map(|(index, amplitude)| (amplitude.conj() * self.amplitudes[index ^ flip_mask]).re)
+            .sum()
+    }
 }

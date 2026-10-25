@@ -7,10 +7,10 @@ The lab focuses on understanding quantum-computing concepts through
 executable examples rather than only theory. The initial experiments use
 Python and Qiskit, including local simulation and later execution on IBM
 Quantum hardware. After the initial Qiskit and IBM hardware experiments, the lab implements
-local quantum simulation in Rust. The CPU simulator now supports Bell-state
-and Bernstein-Vazirani experiments; later work will explore applied quantum
-algorithms, classical numerical comparisons, and Vulkan compute via `ash`
-on the same development machine.
+local quantum simulation in Rust. The CPU simulator now supports Bell-state and Bernstein-Vazirani
+experiments, one- and two-qubit VQE, parameter-shift gradient descent, and
+Pauli expectation values. Next steps are non-diagonal Hamiltonians, classical
+eigenvalue comparisons, and Vulkan compute via `ash` on the same machine.
 
 ## Approach
 
@@ -48,7 +48,10 @@ Bernstein-Vazirani algorithm on a QPU (complete)
 Rust CPU state-vector simulation (Bell and Bernstein-Vazirani complete)
     |
     v
-Applied quantum algorithms (VQE) and classical eigenvalue comparison
+One- and two-qubit VQE with diagonal Hamiltonians (complete)
+    |
+    v
+Non-diagonal VQE and classical Jacobi eigenvalue comparison (planned)
     |
     v
 Bathe numerical examples and Fortran solver references
@@ -663,7 +666,7 @@ simulator. For reproducible comparisons, retain circuit definitions,
 qubit/bit ordering, backend mapping, shots, noise-model configuration,
 software versions and random seeds where available.
 
-## Rust CPU simulator - milestones 01-04 (complete)
+## Rust CPU simulator and VQE - verified milestones
 
 The Rust workspace implements a local ideal quantum state-vector simulator
 without Qiskit or an external quantum simulation engine:
@@ -672,13 +675,16 @@ without Qiskit or an external quantum simulation engine:
   `StateVector` using `num_complex::Complex64` amplitudes.
 - `StateVector::zero(n)` initializes `|00...0>` with `2^n` amplitudes.
 - In-place gates: Hadamard (`hadamard`), Pauli-X (`pauli_x`), Pauli-Z
-  (`pauli_z`), and controlled-NOT (`cnot`).
+  (`pauli_z`), controlled-NOT (`cnot`), and Y-axis rotation (`rotation_y`).
+- Exact state-vector expectations: `expectation_z`, `expectation_zz`, and
+  `expectation_xx`. These evaluate Pauli observables without sampling.
 - `probabilities()` computes squared amplitude magnitudes; `sample()`
   samples a computational-basis outcome using a supplied random generator.
   Sampling does not collapse or mutate the stored state.
 - `quantum_cpu`: executable demonstrations of Bell-state preparation,
   amplitudes, probabilities, 1000 measurement shots, and the
-  Bernstein-Vazirani algorithm with secret `1011`.
+  Bernstein-Vazirani algorithm with secret `1011`, plus one- and two-qubit
+  VQE experiments.
 
 The simulator uses little-endian qubit indexing: qubit 0 is the
 least-significant bit of the basis-state index, matching the convention
@@ -722,48 +728,94 @@ Finite-shot counts from ideal simulators can differ even when they model
 the same state. The IBM results are historical physical-hardware samples,
 not targets for an ideal simulator to reproduce exactly.
 
-### Workspace, tests and dependencies
+### Variational quantum eigensolver (VQE)
 
-The workspace has `quantum_core` (library) and `quantum_cpu` (executable).
-The `rand` version is declared under `[workspace.dependencies]` and opted
-into by both crates using `rand = { workspace = true }`. The `quantum_core`
-unit tests are in `src/tests.rs`; the Bernstein-Vazirani tests are alongside
-the experiment in `quantum_cpu/src/bernstein_vazirani.rs`.
+The one-qubit experiment uses the Hamiltonian `H = Z` and the trial state
+`Ry(theta)|0>`. Its energy is `E(theta) = cos(theta)`, so the exact lowest
+eigenvalue is `-1` at `theta = pi`.
 
-Verified on the laptop:
+Two classical optimization approaches are implemented in `vqe.rs`:
 
-```bash
-cd ~/workdir/quantum_compute_lab/rust
-cargo fmt --all
-cargo check --workspace
-cargo test --workspace
-cargo clippy --workspace --all-targets -- -D warnings
-cargo run -p quantum_cpu
+- A grid search over a single rotation angle.
+- Gradient descent using the parameter-shift identity
+  `dE/dtheta = [E(theta + pi/2) - E(theta - pi/2)] / 2`.
+
+Both approaches were verified to find the same ground-state energy:
+
+```text
+VQE experiment
+Hamiltonian: Z
+
+Grid search
+Optimal theta: 3.141593
+Minimum energy: -1.000000
+
+Gradient descent (parameter shift)
+Optimal theta: 3.141593
+Minimum energy: -1.000000
 ```
 
-Result: **19 `quantum_core` tests + 2 `quantum_cpu` tests = 21 passed**;
-Clippy completed without warnings. Tests cover state initialization,
-normalization, H/X/Z/CNOT behavior, phase interference, sampling, and
-recovery of all 16 possible four-bit Bernstein-Vazirani secrets.
+The two-qubit experiment in `vqe_two_qubit.rs` uses the diagonal Hamiltonian
+`H = Z0 + Z1 + Z0Z1` and independent `Ry` rotations on both qubits. In the
+basis `|00>, |01>, |10>, |11>`, the Hamiltonian is
+`diag(3, -1, -1, -1)`. Its lowest eigenvalue is `-1`, with three-fold
+degeneracy. A two-parameter grid search produced:
 
-The original single-qubit `Qubit` remains as an introductory example;
-`StateVector` is the multi-qubit implementation used by the newer circuits.
+```text
+Two-qubit VQE experiment
+Hamiltonian: Z0 + Z1 + Z0Z1
+Optimal theta_0: 0.000000
+Optimal theta_1: 3.141593
+Minimum energy: -1.000000
+```
+
+The trial circuit uses no entangling gate because this diagonal Hamiltonian
+has product states in its ground-state subspace. These are ideal CPU
+state-vector calculations, not physical IBM QPU measurements.
+
+### Pauli expectation values
+
+`StateVector` computes exact expectations for `Z`, `ZZ`, and `XX` from
+complex amplitudes. The `XX` operator flips two basis bits and introduces
+off-diagonal coupling, preparing the simulator for Hamiltonians containing
+terms such as `X0X1`. The implementation has been verified against zero,
+Bell, phase-flipped Bell, and uniform-superposition states.
+
+### Workspace, tests and dependencies
+
+The workspace contains `quantum_core` (library) and `quantum_cpu`
+(executable). `rand` is declared under `[workspace.dependencies]` and used
+by both crates; `quantum_core` also uses `num-complex`.
+
+Verified locally: **36 `quantum_core` tests + 14 `quantum_cpu` tests = 50
+passed**. `cargo check` and Clippy with warnings denied completed cleanly.
+The tests cover state preparation, gates, normalization, measurement,
+Bernstein-Vazirani, rotations, Pauli expectations, and both VQE examples.
+
+The original single-qubit `Qubit` remains an introductory example;
+`StateVector` is the multi-qubit implementation used by newer circuits.
+Executable commands are maintained separately in `commands.md`.
 
 ## Applied quantum algorithms and numerical computing roadmap
 
 The next objective is to test quantum algorithms on meaningful numerical
 problems, not merely reproduce quantum circuits:
 
-1. Implement a small local Variational Quantum Eigensolver (VQE), starting
-   with a Hamiltonian whose lowest eigenvalue can be checked analytically
-   and with a classical Rust eigensolver.
+1. Extend the completed diagonal VQE examples to a non-diagonal two-qubit
+   Hamiltonian, with an entangling ansatz and local optimization. Compare
+   its lowest eigenvalue with an exact reference and a classical Rust Jacobi
+   eigensolver.
 2. Investigate eigenvalue examples from Klaus-Juergen Bathe's *Finite
    Element Procedures*, using accompanying Fortran routines such as
    `JACOBI.FOR` and `SSPACE.FOR` as algorithm references where suitable.
+   These routines have not yet been compared or executed in this lab.
 3. Evaluate whether any of the user's existing Rust numerical projects
    (`colsol`, `iterative_solvers`, `extended_matrix`) are useful references
    or reusable components. Integration is optional, not a prerequisite.
-4. Develop a Rust Vulkan compute backend using `ash`, with suitable
+4. Optionally compare a fixed optimized circuit against Qiskit Aer and
+   an IBM QPU when access is available; do not treat finite-shot QPU
+   measurements as exact eigenvalues.
+5. Develop a Rust Vulkan compute backend using `ash`, with suitable
    amplitude-update and numerical kernels, then compare CPU/GPU accuracy,
    performance, memory usage, and data-transfer overhead.
 
@@ -835,6 +887,8 @@ quantum_compute_lab/
       src/
         main.rs
         bernstein_vazirani.rs
+        vqe.rs
+        vqe_two_qubit.rs
   README.md
   commands.md
   requirements.txt

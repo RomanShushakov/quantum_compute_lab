@@ -3,6 +3,8 @@ use rand::{SeedableRng, rngs::StdRng};
 
 // mods
 mod bernstein_vazirani;
+mod vqe;
+mod vqe_two_qubit;
 
 // internal imports
 use quantum_core::StateVector;
@@ -78,4 +80,26 @@ fn main() {
             println!("{measured_secret:04b}: {count}");
         }
     }
+
+    let grid_result = vqe::optimize(100);
+    let gradient_result = vqe::optimize_gradient_descent(1.0, 0.2, 100);
+
+    println!("\nVQE experiment");
+    println!("Hamiltonian: Z");
+
+    println!("\nGrid search");
+    println!("Optimal theta: {:.6}", grid_result.theta);
+    println!("Minimum energy: {:.6}", grid_result.energy);
+
+    println!("\nGradient descent (parameter shift)");
+    println!("Optimal theta: {:.6}", gradient_result.theta);
+    println!("Minimum energy: {:.6}", gradient_result.energy);
+
+    let result = vqe_two_qubit::optimize(20);
+
+    println!("\nTwo-qubit VQE experiment");
+    println!("Hamiltonian: Z0 + Z1 + Z0Z1");
+    println!("Optimal theta_0: {:.6}", result.theta_0);
+    println!("Optimal theta_1: {:.6}", result.theta_1);
+    println!("Minimum energy: {:.6}", result.energy);
 }

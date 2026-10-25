@@ -251,3 +251,174 @@ fn sampling_bell_state_returns_only_valid_outcomes() {
     assert!((counts[0] as i64 - 500).abs() < 100);
     assert!((counts[3] as i64 - 500).abs() < 100);
 }
+
+#[test]
+fn rotation_y_zero_is_identity() {
+    let mut state = StateVector::zero(1);
+
+    state.rotation_y(0, 0.0);
+
+    assert!((state.probabilities()[0] - 1.0).abs() < EPSILON);
+    assert!(state.probabilities()[1].abs() < EPSILON);
+}
+
+#[test]
+fn rotation_y_pi_flips_zero_to_one() {
+    let mut state = StateVector::zero(1);
+
+    state.rotation_y(0, std::f64::consts::PI);
+
+    let probabilities = state.probabilities();
+
+    assert!(probabilities[0].abs() < EPSILON);
+    assert!((probabilities[1] - 1.0).abs() < EPSILON);
+}
+
+#[test]
+fn rotation_y_half_pi_creates_equal_probabilities() {
+    let mut state = StateVector::zero(1);
+
+    state.rotation_y(0, std::f64::consts::FRAC_PI_2);
+
+    let probabilities = state.probabilities();
+
+    assert!((probabilities[0] - 0.5).abs() < EPSILON);
+    assert!((probabilities[1] - 0.5).abs() < EPSILON);
+}
+
+#[test]
+fn rotation_y_preserves_normalization() {
+    let mut state = StateVector::zero(2);
+
+    state.hadamard(0);
+    state.cnot(0, 1);
+
+    state.rotation_y(1, 0.7);
+
+    let total: f64 = state.probabilities().iter().sum();
+
+    assert!((total - 1.0).abs() < EPSILON);
+}
+
+#[test]
+fn rotation_y_inverse_restores_state() {
+    let mut state = StateVector::zero(1);
+
+    state.rotation_y(0, 0.73);
+    state.rotation_y(0, -0.73);
+
+    assert!((state.probabilities()[0] - 1.0).abs() < EPSILON);
+    assert!(state.probabilities()[1].abs() < EPSILON);
+}
+
+#[test]
+fn expectation_z_of_zero_state_is_one() {
+    let state = StateVector::zero(1);
+
+    assert!((state.expectation_z(0) - 1.0).abs() < EPSILON);
+}
+
+#[test]
+fn expectation_z_of_one_state_is_minus_one() {
+    let mut state = StateVector::zero(1);
+    state.pauli_x(0);
+
+    assert!((state.expectation_z(0) + 1.0).abs() < EPSILON);
+}
+
+#[test]
+fn expectation_z_after_hadamard_is_zero() {
+    let mut state = StateVector::zero(1);
+    state.hadamard(0);
+
+    assert!(state.expectation_z(0).abs() < EPSILON);
+}
+
+#[test]
+fn expectation_z_matches_rotation_y_cosine() {
+    let angles = [
+        0.0,
+        std::f64::consts::FRAC_PI_4,
+        std::f64::consts::FRAC_PI_2,
+        std::f64::consts::PI,
+        1.7,
+    ];
+
+    for theta in angles {
+        let mut state = StateVector::zero(1);
+        state.rotation_y(0, theta);
+
+        let expected = theta.cos();
+        let actual = state.expectation_z(0);
+
+        assert!((actual - expected).abs() < EPSILON);
+    }
+}
+
+#[test]
+fn expectation_zz_of_zero_state_is_one() {
+    let state = StateVector::zero(2);
+
+    assert!((state.expectation_zz(0, 1) - 1.0).abs() < EPSILON);
+}
+
+#[test]
+fn expectation_zz_of_opposite_bits_is_minus_one() {
+    let mut state = StateVector::zero(2);
+    state.pauli_x(0);
+
+    assert!((state.expectation_zz(0, 1) + 1.0).abs() < EPSILON);
+}
+
+#[test]
+fn expectation_zz_of_bell_state_is_one() {
+    let mut state = StateVector::zero(2);
+    state.hadamard(0);
+    state.cnot(0, 1);
+
+    assert!((state.expectation_zz(0, 1) - 1.0).abs() < EPSILON);
+}
+
+#[test]
+fn expectation_zz_of_uniform_superposition_is_zero() {
+    let mut state = StateVector::zero(2);
+    state.hadamard(0);
+    state.hadamard(1);
+
+    assert!(state.expectation_zz(0, 1).abs() < EPSILON);
+}
+
+#[test]
+fn expectation_xx_of_zero_state_is_zero() {
+    let state = StateVector::zero(2);
+
+    assert!(state.expectation_xx(0, 1).abs() < EPSILON);
+}
+
+#[test]
+fn expectation_xx_of_bell_state_is_one() {
+    let mut state = StateVector::zero(2);
+    state.hadamard(0);
+    state.cnot(0, 1);
+
+    assert!((state.expectation_xx(0, 1) - 1.0).abs() < EPSILON);
+}
+
+#[test]
+fn expectation_xx_of_negative_bell_state_is_minus_one() {
+    let mut state = StateVector::zero(2);
+    state.hadamard(0);
+    state.cnot(0, 1);
+    state.pauli_z(0);
+
+    assert!((state.expectation_xx(0, 1) + 1.0).abs() < EPSILON);
+}
+
+#[test]
+fn expectation_xx_of_uniform_superposition_is_one() {
+    let mut state = StateVector::zero(2);
+    state.hadamard(0);
+    state.hadamard(1);
+
+    assert!((state.expectation_xx(0, 1) - 1.0).abs() < EPSILON);
+}
