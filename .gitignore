@@ -1,5 +1,17 @@
-venv
-__pycache__
+# Python
+venv/
+__pycache__/
 
-rust/target
-rust/Cargo.lock
+# Rust
+/rust/target/
+/rust/target_native/
+/rust/Cargo.lock
+
+# CPU benchmarks
+/results/phase_2_cpu/
+
+# Linux perf profiling
+perf.data
+perf.data.*
+perf_*.data
+perf_*.data.*

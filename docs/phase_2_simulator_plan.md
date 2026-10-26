@@ -50,3 +50,30 @@ Use the local development machine for Vulkan (`ash`). Keep the Rust CPU
 implementation usable independently. Jetson, Slurm, and WebGPU are not part
 of this project's current GPU implementation plan. Return to IBM QPU only
 for a new, clearly specified experiment, not routine validation.
+
+## CPU benchmark baseline (Phase 2, step 1)
+
+`rust/quantum_cpu/src/bin/statevector_bench.rs` is a sequential CPU-only
+microbenchmark. It measures Hadamard and Ry at first/middle/last qubit targets
+and CNOT (control 0, last target) for 10, 15, and 20 qubits. Initialization
+and configurable warm-up iterations are outside the timed region. CSV output
+contains gate, qubit count, target, control, repetitions, warm-up, minimum,
+median, p95, and maximum gate time in microseconds. Results are saved in
+`results/phase_2_cpu/` without overwriting previous runs.
+
+The first exploratory 50-repetition run (before middle targets and CSV files
+were introduced) yielded the following medians at 20 qubits:
+
+| Gate | Target 0 | Target 19 |
+| --- | ---: | ---: |
+| Hadamard | 1400.393 us | 457.477 us |
+| Ry | 1806.621 us | 756.923 us |
+
+These are observations, not proof of a specific cache or vectorization cause.
+The original run had noticeable variability. New CSV runs should establish a
+more stable baseline before any optimization or Vulkan implementation.
+
+The benchmark reuses a statevector across calls. This measures per-gate
+execution rather than circuit-level end-to-end time. State-dependent numerical
+results are not benchmarked here; correctness is covered by the Rust test
+suite. See `commands.md` for execution and recording instructions.

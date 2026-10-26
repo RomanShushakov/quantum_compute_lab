@@ -11,11 +11,12 @@ reduced the Bathe VQE absolute energy error by about 94.1% through qubit
 selection, and validated Bell-state correlations. Historical QPU results
 are preserved as JSON; no further IBM access is required for Phase 2.
 
-**Phase 2 - Rust CPU to Vulkan GPU state-vector engine (planned).** The
-existing `quantum_core` and `quantum_cpu` code is the correctness baseline.
-Next steps are CPU benchmarks, gate-kernel and memory-layout improvements,
-then Vulkan compute via Rust `ash`, with accuracy and performance comparisons
-against the CPU implementation and Qiskit Aer. See
+**Phase 2 - Rust CPU to Vulkan GPU state-vector engine (in progress).** The
+`quantum_core` and `quantum_cpu` crates provide a tested CPU reference.
+Single-threaded CPU gate benchmarks, Hadamard loop-structure experiments,
+and standard/native release comparisons are complete as exploratory
+measurements. Next is Vulkan compute via Rust `ash`, with numerical accuracy
+and performance comparisons against the CPU implementation and Qiskit Aer. See
 `docs/phase_2_simulator_plan.md`.
 
 The goal is engineering understanding and reproducible measurements, not a
@@ -70,7 +71,7 @@ Bathe Exercise 11.1 and numerical validation (complete)
 IBM Kingston Bathe VQE diagnostics and Bell validation (complete)
     |
     v
-Rust CPU benchmarking and Vulkan compute simulation (planned)
+Rust CPU benchmarking (complete); Vulkan compute simulation (next)
 ```
 
 ## Experiments
@@ -689,6 +690,8 @@ without Qiskit or an external quantum simulation engine:
 - `StateVector::zero(n)` initializes `|00...0>` with `2^n` amplitudes.
 - In-place gates: Hadamard (`hadamard`), Pauli-X (`pauli_x`), Pauli-Z
   (`pauli_z`), controlled-NOT (`cnot`), and Y-axis rotation (`rotation_y`).
+  The experimental `hadamard_chunks` implementation traverses disjoint
+  mutable slices and is retained alongside the original gate.
 - Exact state-vector expectations: `expectation_z`, `expectation_zz`, and
   `expectation_xx`. These evaluate Pauli observables without sampling.
 - `probabilities()` computes squared amplitude magnitudes; `sample()`
@@ -875,8 +878,9 @@ The workspace contains `quantum_core` (library) and `quantum_cpu`
 (executable). `rand` is declared under `[workspace.dependencies]` and used
 by both crates; `quantum_core` also uses `num-complex`.
 
-Verified locally: **36 `quantum_core` tests + 28 `quantum_cpu` tests = 64
-passed**. `cargo check` and Clippy with warnings denied completed cleanly.
+Verified locally after the Hadamard chunks experiment: **39 `quantum_core`
+tests + 47 `quantum_cpu` tests + 5 benchmark tests = 91 passed**.
+`cargo check` and Clippy with warnings denied completed cleanly.
 The tests cover state preparation, gates, normalization, measurement,
 Bernstein-Vazirani, rotations, Pauli expectations, diagonal and interacting
 VQE, generalized Jacobi, residuals, mass orthonormality, and fidelity.
@@ -885,6 +889,61 @@ The original single-qubit `Qubit` remains an introductory example;
 `StateVector` is the multi-qubit implementation used by newer circuits.
 Executable commands are maintained separately in `commands.md`.
 
+## Phase 2 - CPU Hadamard profiling and optimization
+
+The CPU reference now has two mathematically equivalent Hadamard methods:
+
+- `StateVector::hadamard`: original index/stride-based amplitude-pair loop.
+- `StateVector::hadamard_chunks`: experimental `chunks_exact_mut`,
+  `split_at_mut`, and `zip` traversal of disjoint amplitude halves.
+
+Tests compare the two methods across qubit counts and targets, check
+normalization, and reject invalid targets. All 91 Rust workspace tests
+passed, and `cargo clippy --workspace --all-targets -- -D warnings`
+completed without warnings.
+
+### Benchmark method and observed results
+
+The `statevector_bench` binary measures one gate application per sample
+using `Instant` after warm-up. Allocation is excluded from timed samples.
+The comparison used 20 qubits (1,048,576 `Complex64` amplitudes, 16 MiB),
+100 warmups, and 1,000 repetitions per implementation and target.
+The recorded figures below are **median microseconds** (lower is better).
+
+| Target qubit | Standard baseline | Standard chunks | Native baseline | Native chunks |
+| ---: | ---: | ---: | ---: | ---: |
+| 0 | 1374.660 | 532.622 | 1297.177 | 679.361 |
+| 10 | 704.412 | 675.393 | 718.905 | 617.032 |
+| 19 | 474.542 | 441.176 | 393.392 | 462.541 |
+
+The standard build used `cargo run --release`; the native build used
+`RUSTFLAGS="-C target-cpu=native"` with a separate `CARGO_TARGET_DIR`.
+For target 0, chunks was about **2.58x faster** than the standard
+baseline (about 61% lower median time). At targets 10 and 19 the
+relative advantage was smaller or reversed, depending on the build.
+
+An earlier `perf stat` comparison for the original 20-qubit Hadamard
+showed roughly 36.33 billion instructions for target 0 versus 10.96
+billion for target 19 over whole benchmark processes. Disassembly
+showed multiple loop paths and substantial index/loop-control logic.
+These observations support investigating iteration overhead but do
+not prove which compiler transformation caused the speedups.
+
+These are **exploratory, not definitive** microbenchmarks: each
+implementation is measured sequentially (baseline first), with
+possible cache, scheduling, CPU-frequency, and thermal effects.
+The native and standard runs were not interleaved or independently
+repeated enough to establish small differences reliably. The benchmark
+repeatedly applies Hadamard to the same allocated state; it does not
+represent full-circuit performance or a CPU/GPU speedup claim.
+
+CSV output is retained locally under `results/phase_2_cpu/`. Both
+Hadamard implementations remain in the CPU reference rather than
+choosing one universally optimal variant. The next step is Vulkan
+device discovery and a minimal Rust `ash` compute shader on the
+local development laptop, followed by numerical equivalence checks
+before GPU performance comparisons. See `commands.md` for exact runs.
+
 ## Engineering roadmap
 
 Phase 1 is complete: interacting VQE, generalized Jacobi validation,
@@ -892,10 +951,11 @@ Bathe Exercise 11.1, fixed-angle Aer/QPU comparisons, physical-pair
 calibration, and Bell-state verification. See `docs/09_bathe_vqe_qpu.md`
 for hardware job IDs and the limits of the conclusions.
 
-Phase 2 prioritizes the local Rust state-vector simulator: establish a
-repeatable CPU baseline, profile gate operations and memory use, improve
-CPU kernels where justified, then implement and benchmark Vulkan compute
-kernels with `ash`. Detailed milestones and acceptance criteria are in
+Phase 2 uses the local Rust state-vector simulator. An exploratory
+single-threaded CPU gate baseline, profiling, and an alternative Hadamard
+kernel are complete. Both CPU implementations remain available as references;
+the next milestone is implementing and benchmarking Vulkan compute kernels
+with `ash`. Detailed milestones and acceptance criteria are in
 `docs/phase_2_simulator_plan.md`. Return to QPU hardware only for a
 specific, testable research question; it is not a Phase 2 dependency.
 
@@ -960,10 +1020,11 @@ quantum_compute_lab/
     07_interacting_vqe/      main.py, verify_isa_local.py
     08_bathe_vqe_aer/        main.py
     09_bathe_vqe_qpu/        main.py, calibrate.py, diagnose.py, bell_state.py
-  results/                  historical JSON results (04-07, 09)
+  results/                  historical JSON and local CPU benchmark CSVs
   rust/
     quantum_core/src/       lib.rs, tests/
     quantum_cpu/src/        main.rs, algorithms, numerical solvers, tests/
+    quantum_cpu/src/bin/    statevector_bench.rs
     Cargo.toml
   result_writer.py
   README.md

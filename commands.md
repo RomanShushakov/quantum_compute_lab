@@ -350,8 +350,8 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo run -p quantum_cpu
 ```
 
-Verified: **64 tests passed** (36 in `quantum_core`, 28 in
-`quantum_cpu`), zero failures, and no Clippy warnings.
+Historical milestone: 64 tests passed (36 in `quantum_core`, 28 in
+`quantum_cpu`). The current verified total is 91; see Phase 2 below.
 
 `quantum_core/src/tests.rs` contains the core unit tests.
 `quantum_cpu/src/bernstein_vazirani.rs` contains the Bernstein-Vazirani
@@ -472,9 +472,9 @@ Mass Gram matrix (Phi^T M Phi):
 `jacobi::eigenpair_residuals()` checks
 `||K*phi_i - lambda_i*M*phi_i||_2` using the original matrices, while
 `jacobi::mass_gram_matrix()` checks `Phi^T*M*Phi` against the identity.
-The full Rust test suite currently passes 64 tests (36 core, 28 CPU),
-with zero Clippy warnings. These commands run locally and do not submit
-IBM QPU jobs.
+At this historical milestone, the Rust suite passed 64 tests (36 core,
+28 CPU). The current verified total is 91; see Phase 2 below.
+These commands run locally and do not submit IBM QPU jobs.
 
 
 ### Experiment 07 - Python and local ISA verification
@@ -568,3 +568,121 @@ Return to the repository root with `cd ..`. Record benchmark hardware,
 compiler/build profile, input size, repetitions, elapsed time, and numerical
 error before comparing CPU and GPU results. See
 `docs/phase_2_simulator_plan.md`. No Vulkan benchmark results exist yet.
+
+## Phase 2 - Reproducible CPU gate baseline
+
+Run from the repository root. The benchmark is single-threaded and measures
+one gate application at a time, excluding state allocation and warm-up.
+Hadamard and Ry use target qubits 0, middle, and last; CNOT uses control 0
+and the last target. Output includes min, median, p95, and max microseconds.
+The CSV file is saved automatically under `results/phase_2_cpu/` using a
+Unix-timestamp filename. Existing files are never overwritten.
+
+```bash
+cd rust
+cargo fmt --all -- --check
+cargo check --workspace
+cargo test --workspace
+cargo clippy --workspace --all-targets -- -D warnings
+cargo run --release -p quantum_cpu --bin statevector_bench
+cargo run --release -p quantum_cpu --bin statevector_bench -- --repetitions 100 --warmup 20
+cd ..
+```
+
+Optionally specify an output path (relative to the shell's current directory):
+
+```bash
+cd rust
+cargo run --release -p quantum_cpu --bin statevector_bench -- \
+  --repetitions 100 --warmup 20 \
+  --output ../results/phase_2_cpu/manual_run.csv
+cd ..
+```
+
+Record CPU model, OS, `rustc --version`, build profile, and machine load
+alongside the CSV. These timings are exploratory and can be affected by
+thermal state, scheduling, caches, and compiler optimizations. For reliable
+CPU/GPU comparisons, use repeated runs and equivalent workloads.
+
+## Phase 2 - Hadamard chunks and native CPU comparison (completed)
+
+Run from `rust/`. The benchmark accepts `--implementation baseline|chunks|both`
+for a targeted Hadamard run. Both implementations use the same mathematical
+gate; `chunks` uses disjoint mutable slices. The default is `baseline`.
+
+```bash
+cd ~/workdir/quantum_compute_lab/rust
+
+cargo fmt --all -- --check
+cargo check --workspace
+cargo test --workspace
+cargo clippy --workspace --all-targets -- -D warnings
+```
+
+Verified: 39 core tests, 47 CPU executable tests, and 5 benchmark tests
+(91 total), with no failures or Clippy warnings.
+
+Standard release comparison (20 qubits, targets 0, 10, 19, 100 warmups,
+1,000 repetitions):
+
+```bash
+for target in 0 10 19; do
+  cargo run --release -p quantum_cpu --bin statevector_bench -- \
+    --gate hadamard \
+    --qubits 20 \
+    --target "$target" \
+    --implementation both \
+    --repetitions 1000 \
+    --warmup 100
+done
+```
+
+Build the CPU-specific version separately so it does not overwrite the
+standard release binary:
+
+```bash
+CARGO_TARGET_DIR=target_native \
+RUSTFLAGS="-C target-cpu=native" \
+cargo build --release -p quantum_cpu --bin statevector_bench
+```
+
+Repeat the same experiment with the native build:
+
+```bash
+for target in 0 10 19; do
+  CARGO_TARGET_DIR=target_native \
+  RUSTFLAGS="-C target-cpu=native" \
+  cargo run --release -p quantum_cpu --bin statevector_bench -- \
+    --gate hadamard \
+    --qubits 20 \
+    --target "$target" \
+    --implementation both \
+    --repetitions 1000 \
+    --warmup 100
+done
+```
+
+Recorded median times in microseconds:
+
+```text
+target  standard_baseline  standard_chunks  native_baseline  native_chunks
+0       1374.660           532.622          1297.177         679.361
+10       704.412           675.393           718.905         617.032
+19       474.542           441.176           393.392         462.541
+```
+
+CSV output is automatically saved under `results/phase_2_cpu/` with
+unique filenames and an `implementation` column. Keep the generated
+benchmark data local according to the repository's existing Git ignore
+rules. Baseline is always measured before chunks within a run; small
+differences require repeated and counterbalanced measurements.
+
+To remove the temporary assembly dump created during profiling:
+
+```bash
+rm -f /tmp/hadamard_assembly.txt
+```
+
+The CPU comparison is complete as an exploratory exercise. Next:
+Rust `ash` Vulkan device/compute-queue discovery and a minimal compute
+shader on the local laptop. No Vulkan performance results exist yet.
