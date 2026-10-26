@@ -3,6 +3,8 @@
 //! Run in release mode. Each timed sample applies one gate to an already
 //! allocated statevector; initialization and warm-up are excluded.
 //! This remains an exploratory microbenchmark, not a statistical framework.
+//! When comparing both Hadamard variants, baseline is always timed first;
+//! order and thermal effects can influence the observed differences.
 
 use quantum_core::StateVector;
 use std::fs::{self, File};
@@ -222,6 +224,7 @@ fn measure(
 
     samples.sort_unstable();
     let min = samples[0];
+    // For an even sample count, report the upper middle sample.
     let median = samples[samples.len() / 2];
     let p95 = percentile_nearest_rank(&samples, 95, 100);
     let max = samples[samples.len() - 1];

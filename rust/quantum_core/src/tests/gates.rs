@@ -212,3 +212,44 @@ fn rotation_y_inverse_restores_state() {
     assert!((state.probabilities()[0] - 1.0).abs() < EPSILON);
     assert!(state.probabilities()[1].abs() < EPSILON);
 }
+
+// Cross-check the slice-based Hadamard against the reference.
+#[test]
+fn chunks_match_reference_for_all_targets() {
+    for qubits in 1..=8 {
+        for target in 0..qubits {
+            let mut reference = StateVector::zero(qubits);
+            // Use nonzero complex amplitudes to exercise both halves,
+            // rather than relying only on the initial |0...0> state.
+            for (index, amplitude) in reference.amplitudes.iter_mut().enumerate() {
+                let x = index as f64;
+                *amplitude = Complex64::new((x + 1.0) * 0.003, (x - 2.0) * -0.007);
+            }
+            let mut alternative = StateVector {
+                num_qubits: qubits,
+                amplitudes: reference.amplitudes.clone(),
+            };
+            reference.hadamard(target);
+            alternative.hadamard_chunks(target);
+            for (actual, expected) in alternative.amplitudes.iter().zip(&reference.amplitudes) {
+                assert!((*actual - *expected).norm() < 1e-12);
+            }
+        }
+    }
+}
+
+#[test]
+fn chunks_preserve_normalization() {
+    let mut state = StateVector::zero(6);
+    for target in 0..state.num_qubits {
+        state.hadamard_chunks(target);
+    }
+    let probability: f64 = state.amplitudes.iter().map(Complex64::norm_sqr).sum();
+    assert!((probability - 1.0).abs() < 1e-12);
+}
+
+#[test]
+#[should_panic(expected = "invalid target qubit")]
+fn chunks_reject_invalid_target() {
+    StateVector::zero(2).hadamard_chunks(2);
+}
