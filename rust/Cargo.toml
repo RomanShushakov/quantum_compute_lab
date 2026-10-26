@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["quantum_core", "quantum_cpu"]
+members = ["quantum_core", "quantum_cpu", "quantum_gpu"]
 
 [workspace.dependencies]
 rand = "0.10.3"
