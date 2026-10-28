@@ -722,3 +722,10 @@ Expected results:
 - 91 Rust tests passing.
 
 Note: SPIR-V is generated locally and excluded from Git.
+
+
+
+naga quantum_gpu/shaders/hadamard.wgsl \
+     quantum_gpu/shaders/hadamard.spv
+
+naga quantum_gpu/shaders/hadamard.wgsl

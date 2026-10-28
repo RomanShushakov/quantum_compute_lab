@@ -4,7 +4,7 @@ mod context;
 
 use ash::vk;
 use buffer::StorageBuffer;
-use compute::run_transform;
+use compute::{run_hadamard, run_transform};
 use context::{ComputeDevice, VulkanContext};
 use std::error::Error;
 use std::ffi::CStr;
@@ -47,7 +47,65 @@ fn verify_compute_device(
     println!("  GPU transform output: {gpu_output:?}");
     assert_eq!(gpu_output, expected);
     println!("  GPU compute dispatch verified");
+
+    // Two-qubit |00> state, interleaved real/imaginary f32 components.
+    let initial = [1.0_f32, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+    let state = StorageBuffer::new(
+        instance,
+        physical_device,
+        compute.device(),
+        std::mem::size_of_val(&initial) as vk::DeviceSize,
+    )?;
+    state.write_f32(&initial)?;
+    run_hadamard(&compute, instance, physical_device, &state, 4, 0)?;
+    let result = state.read_f32(initial.len())?;
+    let inv_sqrt_2 = std::f32::consts::FRAC_1_SQRT_2;
+    let expected = [inv_sqrt_2, 0.0, inv_sqrt_2, 0.0, 0.0, 0.0, 0.0, 0.0];
+    assert_approx_eq(&result, &expected, 1e-5);
+    println!("  GPU Hadamard target 0: {result:?}");
+
+    run_hadamard(&compute, instance, physical_device, &state, 4, 0)?;
+    let restored = state.read_f32(initial.len())?;
+    assert_approx_eq(&restored, &initial, 1e-5);
+    println!("  GPU Hadamard twice restores the input");
+
+    state.write_f32(&initial)?;
+    run_hadamard(&compute, instance, physical_device, &state, 4, 1)?;
+    let result = state.read_f32(initial.len())?;
+    let expected = [inv_sqrt_2, 0.0, 0.0, 0.0, inv_sqrt_2, 0.0, 0.0, 0.0];
+    assert_approx_eq(&result, &expected, 1e-5);
+    println!("  GPU Hadamard target 1: {result:?}");
+
+    // Complex input verifies both real and imaginary components.
+    let complex_input = [0.5_f32, 0.25, 0.25, -0.5];
+    let complex_state = StorageBuffer::new(
+        instance,
+        physical_device,
+        compute.device(),
+        std::mem::size_of_val(&complex_input) as vk::DeviceSize,
+    )?;
+    complex_state.write_f32(&complex_input)?;
+    run_hadamard(&compute, instance, physical_device, &complex_state, 2, 0)?;
+    let complex_output = complex_state.read_f32(complex_input.len())?;
+    let complex_expected = [
+        0.75 * inv_sqrt_2,
+        -0.25 * inv_sqrt_2,
+        0.25 * inv_sqrt_2,
+        0.75 * inv_sqrt_2,
+    ];
+    assert_approx_eq(&complex_output, &complex_expected, 1e-5);
+    println!("  GPU Hadamard complex amplitudes verified");
     Ok(())
+}
+
+fn assert_approx_eq(actual: &[f32], expected: &[f32], tolerance: f32) {
+    assert_eq!(actual.len(), expected.len());
+    for (index, (&a, &b)) in actual.iter().zip(expected).enumerate() {
+        assert!(
+            (a - b).abs() <= tolerance,
+            "amplitude component {index}: expected {b}, got {a}"
+        );
+    }
 }
 
 fn inspect_memory(instance: &ash::Instance, physical_device: vk::PhysicalDevice) {

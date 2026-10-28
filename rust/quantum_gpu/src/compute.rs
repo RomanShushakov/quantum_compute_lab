@@ -22,6 +22,8 @@ impl<'a> ComputePipeline<'a> {
         device: &'a ash::Device,
         buffer: vk::Buffer,
         size: vk::DeviceSize,
+        shader_name: &str,
+        uniform: Option<&StorageBuffer<'_>>,
     ) -> Result<Self, Box<dyn Error>> {
         let mut owned = Self {
             device,
@@ -33,18 +35,38 @@ impl<'a> ComputePipeline<'a> {
             shader_module: vk::ShaderModule::null(),
         };
 
-        let binding = [vk::DescriptorSetLayoutBinding::default()
-            .binding(0)
-            .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
-            .descriptor_count(1)
-            .stage_flags(vk::ShaderStageFlags::COMPUTE)];
-        let layout_info = vk::DescriptorSetLayoutCreateInfo::default().bindings(&binding);
+        let mut bindings = vec![
+            vk::DescriptorSetLayoutBinding::default()
+                .binding(0)
+                .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+                .descriptor_count(1)
+                .stage_flags(vk::ShaderStageFlags::COMPUTE),
+        ];
+        if uniform.is_some() {
+            bindings.push(
+                vk::DescriptorSetLayoutBinding::default()
+                    .binding(1)
+                    .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+                    .descriptor_count(1)
+                    .stage_flags(vk::ShaderStageFlags::COMPUTE),
+            );
+        }
+        let layout_info = vk::DescriptorSetLayoutCreateInfo::default().bindings(&bindings);
         owned.descriptor_set_layout =
             unsafe { device.create_descriptor_set_layout(&layout_info, None)? };
 
-        let pool_sizes = [vk::DescriptorPoolSize::default()
-            .ty(vk::DescriptorType::STORAGE_BUFFER)
-            .descriptor_count(1)];
+        let mut pool_sizes = vec![
+            vk::DescriptorPoolSize::default()
+                .ty(vk::DescriptorType::STORAGE_BUFFER)
+                .descriptor_count(1),
+        ];
+        if uniform.is_some() {
+            pool_sizes.push(
+                vk::DescriptorPoolSize::default()
+                    .ty(vk::DescriptorType::UNIFORM_BUFFER)
+                    .descriptor_count(1),
+            );
+        }
         let pool_info = vk::DescriptorPoolCreateInfo::default()
             .pool_sizes(&pool_sizes)
             .max_sets(1);
@@ -59,11 +81,28 @@ impl<'a> ComputePipeline<'a> {
             .buffer(buffer)
             .offset(0)
             .range(size)];
-        let writes = [vk::WriteDescriptorSet::default()
-            .dst_set(owned.descriptor_set)
-            .dst_binding(0)
-            .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&buffer_info)];
+        let uniform_info = uniform.map(|storage| {
+            [vk::DescriptorBufferInfo::default()
+                .buffer(storage.buffer())
+                .offset(0)
+                .range(8)]
+        });
+        let mut writes = vec![
+            vk::WriteDescriptorSet::default()
+                .dst_set(owned.descriptor_set)
+                .dst_binding(0)
+                .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+                .buffer_info(&buffer_info),
+        ];
+        if let Some(ref uniform_info) = uniform_info {
+            writes.push(
+                vk::WriteDescriptorSet::default()
+                    .dst_set(owned.descriptor_set)
+                    .dst_binding(1)
+                    .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+                    .buffer_info(uniform_info),
+            );
+        }
         unsafe { device.update_descriptor_sets(&writes, &[]) };
 
         let pipeline_layout_info =
@@ -71,8 +110,9 @@ impl<'a> ComputePipeline<'a> {
         owned.pipeline_layout =
             unsafe { device.create_pipeline_layout(&pipeline_layout_info, None)? };
 
-        // Compile with: naga quantum_gpu/shaders/transform.wgsl quantum_gpu/shaders/transform.spv
-        let shader_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("shaders/transform.spv");
+        let shader_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("shaders")
+            .join(shader_name);
         let shader_bytes = std::fs::read(&shader_path).map_err(|error| {
             format!(
                 "cannot read {} ({error}); compile the WGSL shader with naga first",
@@ -142,12 +182,18 @@ pub fn run_transform(
     }
 
     let device = compute.device();
-    let pipeline = ComputePipeline::new(device, storage.buffer(), storage.size())?;
+    let pipeline = ComputePipeline::new(
+        device,
+        storage.buffer(),
+        storage.size(),
+        "transform.spv",
+        None,
+    )?;
 
-    dispatch_transform(compute, &pipeline, count)
+    dispatch_compute(compute, &pipeline, count)
 }
 
-fn dispatch_transform(
+fn dispatch_compute(
     compute: &ComputeDevice<'_>,
     pipeline: &ComputePipeline<'_>,
     count: usize,
@@ -207,4 +253,47 @@ fn dispatch_transform(
     }
     unsafe { device.free_command_buffers(compute.command_pool(), &buffers) };
     result
+}
+
+/// In-place Hadamard on interleaved [real, imaginary] f32 amplitudes.
+/// The state vector must have a power-of-two number of complex amplitudes.
+pub fn run_hadamard(
+    compute: &ComputeDevice<'_>,
+    instance: &ash::Instance,
+    physical_device: vk::PhysicalDevice,
+    storage: &StorageBuffer<'_>,
+    amplitude_count: usize,
+    target: u32,
+) -> Result<(), Box<dyn Error>> {
+    if amplitude_count < 2 || !amplitude_count.is_power_of_two() {
+        return Err("amplitude count must be a power of two and at least 2".into());
+    }
+    if target >= amplitude_count.trailing_zeros() {
+        return Err("Hadamard target qubit is out of range".into());
+    }
+    let required_bytes = amplitude_count
+        .checked_mul(2)
+        .and_then(|n| n.checked_mul(std::mem::size_of::<f32>()))
+        .ok_or("state vector size overflow")?;
+    if required_bytes as u64 > storage.size() {
+        return Err("state vector exceeds storage buffer size".into());
+    }
+    let amplitude_count_u32 = u32::try_from(amplitude_count)?;
+    let pairs = amplitude_count / 2;
+    let params = StorageBuffer::new_with_usage(
+        instance,
+        physical_device,
+        compute.device(),
+        8,
+        vk::BufferUsageFlags::UNIFORM_BUFFER,
+    )?;
+    params.write_u32(&[target, amplitude_count_u32])?;
+    let pipeline = ComputePipeline::new(
+        compute.device(),
+        storage.buffer(),
+        required_bytes as vk::DeviceSize,
+        "hadamard.spv",
+        Some(&params),
+    )?;
+    dispatch_compute(compute, &pipeline, pairs)
 }

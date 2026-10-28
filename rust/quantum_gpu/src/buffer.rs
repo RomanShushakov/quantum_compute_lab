@@ -16,9 +16,25 @@ impl<'a> StorageBuffer<'a> {
         device: &'a ash::Device,
         size: vk::DeviceSize,
     ) -> Result<Self, Box<dyn Error>> {
+        Self::new_with_usage(
+            instance,
+            physical_device,
+            device,
+            size,
+            vk::BufferUsageFlags::STORAGE_BUFFER,
+        )
+    }
+
+    pub fn new_with_usage(
+        instance: &ash::Instance,
+        physical_device: vk::PhysicalDevice,
+        device: &'a ash::Device,
+        size: vk::DeviceSize,
+        usage: vk::BufferUsageFlags,
+    ) -> Result<Self, Box<dyn Error>> {
         let buffer_info = vk::BufferCreateInfo::default()
             .size(size)
-            .usage(vk::BufferUsageFlags::STORAGE_BUFFER)
+            .usage(usage)
             .sharing_mode(vk::SharingMode::EXCLUSIVE);
         let buffer = unsafe { device.create_buffer(&buffer_info, None)? };
         let result = (|| -> Result<(vk::DeviceMemory, u32), Box<dyn Error>> {
@@ -84,6 +100,15 @@ impl<'a> StorageBuffer<'a> {
         let mapped = MappedMemory::new(self.device, self.memory, self.size)?;
         unsafe {
             std::ptr::copy_nonoverlapping(values.as_ptr(), mapped.ptr.cast::<f32>(), values.len());
+        }
+        Ok(())
+    }
+
+    pub fn write_u32(&self, values: &[u32]) -> Result<(), Box<dyn Error>> {
+        self.check_size(values.len())?;
+        let mapped = MappedMemory::new(self.device, self.memory, self.size)?;
+        unsafe {
+            std::ptr::copy_nonoverlapping(values.as_ptr(), mapped.ptr.cast::<u32>(), values.len());
         }
         Ok(())
     }
