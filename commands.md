@@ -351,7 +351,7 @@ cargo run -p quantum_cpu
 ```
 
 Historical milestone: 64 tests passed (36 in `quantum_core`, 28 in
-`quantum_cpu`). The current verified total is 91; see Phase 2 below.
+`quantum_cpu`). The latest verified total is 92; see the GPU benchmark section below.
 
 `quantum_core/src/tests.rs` contains the core unit tests.
 `quantum_cpu/src/bernstein_vazirani.rs` contains the Bernstein-Vazirani
@@ -473,7 +473,7 @@ Mass Gram matrix (Phi^T M Phi):
 `||K*phi_i - lambda_i*M*phi_i||_2` using the original matrices, while
 `jacobi::mass_gram_matrix()` checks `Phi^T*M*Phi` against the identity.
 At this historical milestone, the Rust suite passed 64 tests (36 core,
-28 CPU). The current verified total is 91; see Phase 2 below.
+28 CPU). The latest verified total is 92; see the GPU benchmark section below.
 These commands run locally and do not submit IBM QPU jobs.
 
 
@@ -567,7 +567,7 @@ cargo run -p quantum_cpu
 Return to the repository root with `cd ..`. Record benchmark hardware,
 compiler/build profile, input size, repetitions, elapsed time, and numerical
 error before comparing CPU and GPU results. See
-`docs/phase_2_simulator_plan.md`. No Vulkan benchmark results exist yet.
+`docs/phase_2_simulator_plan.md`. Vulkan benchmark results are documented in `docs/gpu_benchmark.md`.
 
 ## Phase 2 - Reproducible CPU gate baseline
 
@@ -619,8 +619,9 @@ cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
 ```
 
-Verified: 39 core tests, 47 CPU executable tests, and 5 benchmark tests
-(91 total), with no failures or Clippy warnings.
+Verified: 39 core tests, 47 CPU algorithm tests, 5 CPU benchmark tests,
+and 1 GPU benchmark reference test (92 total), with no failures or Clippy
+warnings.
 
 Standard release comparison (20 qubits, targets 0, 10, 19, 100 warmups,
 1,000 repetitions):
@@ -683,9 +684,9 @@ To remove the temporary assembly dump created during profiling:
 rm -f /tmp/hadamard_assembly.txt
 ```
 
-The CPU comparison is complete as an exploratory exercise. Next:
-Rust `ash` Vulkan device/compute-queue discovery and a minimal compute
-shader on the local laptop. No Vulkan performance results exist yet.
+The CPU comparison is complete as an exploratory exercise. Vulkan
+compute, prepared circuits, and timestamp-enabled benchmarks have since
+been implemented; see the commands below.
 
 
 ## Phase 2 — Vulkan GPU backend
@@ -719,9 +720,10 @@ Expected results:
 - Compute queue family 1 selected.
 - Logical device created with shaderFloat64 enabled.
 - Empty command buffer submitted successfully.
-- 91 Rust tests passing.
+- 92 Rust tests passing.
 
-Note: SPIR-V is generated locally and excluded from Git.
+Note: WGSL is the source; the current repository also tracks compiled
+SPIR-V binaries because the executables load them at runtime.
 
 
 
@@ -729,3 +731,43 @@ naga quantum_gpu/shaders/hadamard.wgsl \
      quantum_gpu/shaders/hadamard.spv
 
 naga quantum_gpu/shaders/hadamard.wgsl
+
+
+### Compile all GPU shaders with Naga
+
+From `rust/` (requires the Naga CLI):
+
+```bash
+for gate in transform hadamard ry cnot; do
+  naga "quantum_gpu/shaders/${gate}.wgsl" "quantum_gpu/shaders/${gate}.spv"
+done
+```
+
+### Final Vulkan and Bathe VQE verification
+
+```bash
+cargo fmt --all -- --check
+cargo test --workspace
+cargo clippy --workspace --all-targets -- -D warnings
+cargo run --release -p quantum_gpu
+cargo run --release -p quantum_gpu --bin bathe_gpu
+cargo run --release -p quantum_gpu --bin circuit_bench
+```
+
+The last binary runs a prepared 12-gate H/Ry/CNOT circuit at 10, 15, and
+20 qubits with three warmups and nine measured samples, and reports CPU
+`f64` timing, GPU `f32` submission/wait, optional device timestamps, mapped
+readback, setup, end-to-end time, and maximum amplitude error. See
+`docs/gpu_benchmark.md` for definitions and limitations.
+
+To repeat the benchmark twice without modifying the code:
+
+```bash
+for run in 1 2; do
+  echo "=== Benchmark run $run ==="
+  cargo run --release -p quantum_gpu --bin circuit_bench
+done
+```
+
+The QPU results in `results/` are historical; these commands do not submit
+new IBM jobs.

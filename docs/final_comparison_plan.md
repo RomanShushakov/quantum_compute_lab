@@ -19,11 +19,12 @@ state-vector expectation values, not shot sampling. IBM uses measurements.
 
 | Method | Ground-energy estimate | Status |
 | --- | ---: | --- |
-| Classical / ideal Rust VQE | 0.724456493728 | Existing reference |
+| Classical Jacobi | 0.724456494 (rounded) | Numerical eigenvalue reference |
+| Rust CPU ideal VQE (`f64`) | 0.724456493728 | Verified |
 | Qiskit Aer sampled | 0.735229872905 | Historical |
 | IBM QPU physical pair [0,1] | 6.672486800770 | Historical |
 | IBM QPU physical pair [88,89] | 1.073026699181 | Historical |
-| Vulkan GPU VQE | pending | Run bathe_gpu |
+| Vulkan GPU ideal VQE (`f32`) | 0.7244564897 | Verified at CPU-optimized angles |
 
 The two IBM physical mappings yielded very different energies. This is
 consistent with hardware-dependent noise, native-gate transpilation,
@@ -52,6 +53,11 @@ comparable to isolated CPU/GPU kernels.
 
 ## Reproducibility
 
-Compile WGSL with Naga, run workspace tests and clippy, execute GPU smoke
-test and bathe_gpu, save stdout and hardware information, and then update
-the pending GPU row with measured results. Keep negative QPU outcomes.
+Compile WGSL with Naga, run workspace tests and strict Clippy, execute GPU
+smoke tests, `bathe_gpu`, and `circuit_bench`, and preserve stdout and
+hardware information. The verified suite currently contains 92 tests.
+The 12-gate circuit benchmark (three warmups, nine samples) was repeated
+three times; 20-qubit CPU `f64` medians were 8.904–9.612 ms, GPU device
+medians 3.436–3.603 ms, and GPU end-to-end medians 5.979–6.477 ms
+(excluding one-time setup). See `docs/gpu_benchmark.md` for all sizes,
+timestamp support, and limitations. Keep negative QPU outcomes.

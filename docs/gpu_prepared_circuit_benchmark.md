@@ -13,4 +13,4 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo run --release -p quantum_gpu --bin bathe_gpu
 ```
 
-Next benchmarking step: use Vulkan timestamp queries (if supported) for shader-only timing and a matched CPU/GPU precision/measurement methodology.
+Vulkan timestamp queries and a 12-gate benchmark were subsequently added; see `docs/gpu_benchmark.md` for measured results and remaining precision/driver limitations.

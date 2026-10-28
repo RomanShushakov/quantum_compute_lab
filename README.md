@@ -11,13 +11,15 @@ reduced the Bathe VQE absolute energy error by about 94.1% through qubit
 selection, and validated Bell-state correlations. Historical QPU results
 are preserved as JSON; no further IBM access is required for Phase 2.
 
-**Phase 2 - Rust CPU to Vulkan GPU state-vector engine (in progress).** The
-`quantum_core` and `quantum_cpu` crates provide a tested CPU reference.
-Single-threaded CPU gate benchmarks, Hadamard loop-structure experiments,
-and standard/native release comparisons are complete as exploratory
-measurements. Next is Vulkan compute via Rust `ash`, with numerical accuracy
-and performance comparisons against the CPU implementation and Qiskit Aer. See
-`docs/phase_2_simulator_plan.md`.
+**Phase 2 - Rust CPU and Vulkan GPU state-vector engines (validated,
+2026-10-28).** The `quantum_core`, `quantum_cpu`, and `quantum_gpu` crates
+provide classical reference calculations and a direct Vulkan compute backend
+using Rust `ash`, WGSL, and Naga-generated SPIR-V. Prepared GPU-resident
+circuits, Bathe VQE numerical comparison, Vulkan timestamp queries, and a
+repeated 12-gate benchmark have been exercised on the WSL2/Dozen development
+stack. The workspace has **92 passing automated tests** and clean strict
+Clippy. See `docs/gpu_implementation.md`, `docs/gpu_benchmark.md`, and
+`docs/final_comparison_plan.md` for scope and limitations.
 
 The goal is engineering understanding and reproducible measurements, not a
 claim of quantum advantage. QPU error depends on device conditions and
@@ -71,7 +73,7 @@ Bathe Exercise 11.1 and numerical validation (complete)
 IBM Kingston Bathe VQE diagnostics and Bell validation (complete)
     |
     v
-Rust CPU benchmarking (complete); Vulkan compute simulation (next)
+Rust CPU and Vulkan GPU simulation, validation, and benchmarking (complete)
 ```
 
 ## Experiments
@@ -621,7 +623,7 @@ only when explicitly passed `--submit`.
 
 The next phase builds on the completed Rust CPU state-vector simulator:
 apply quantum algorithms to numerical problems, compare against classical
-solvers, and later investigate Vulkan compute via `ash`.
+solvers, and compare against Vulkan compute implemented with `ash`.
 
 
 ## JSON experiment results
@@ -874,12 +876,14 @@ Bell, phase-flipped Bell, and uniform-superposition states.
 
 ### Workspace, tests and dependencies
 
-The workspace contains `quantum_core` (library) and `quantum_cpu`
-(executable). `rand` is declared under `[workspace.dependencies]` and used
+The Rust workspace contains `quantum_core`, `quantum_cpu`, and
+`quantum_gpu` (each exposing reusable library modules; CPU and GPU also
+provide executables). `rand` is declared under `[workspace.dependencies]` and used
 by both crates; `quantum_core` also uses `num-complex`.
 
-Verified locally after the Hadamard chunks experiment: **39 `quantum_core`
-tests + 47 `quantum_cpu` tests + 5 benchmark tests = 91 passed**.
+Latest verified workspace run: **39 `quantum_core` tests + 47 `quantum_cpu`
+algorithm tests + 5 CPU benchmark tests + 1 GPU benchmark reference test
+= 92 passed**.
 `cargo check` and Clippy with warnings denied completed cleanly.
 The tests cover state preparation, gates, normalization, measurement,
 Bernstein-Vazirani, rotations, Pauli expectations, diagonal and interacting
@@ -898,7 +902,7 @@ The CPU reference now has two mathematically equivalent Hadamard methods:
   `split_at_mut`, and `zip` traversal of disjoint amplitude halves.
 
 Tests compare the two methods across qubit counts and targets, check
-normalization, and reject invalid targets. All 91 Rust workspace tests
+normalization, and reject invalid targets. The latest 92 Rust workspace tests
 passed, and `cargo clippy --workspace --all-targets -- -D warnings`
 completed without warnings.
 
@@ -939,10 +943,9 @@ represent full-circuit performance or a CPU/GPU speedup claim.
 
 CSV output is retained locally under `results/phase_2_cpu/`. Both
 Hadamard implementations remain in the CPU reference rather than
-choosing one universally optimal variant. The next step is Vulkan
-device discovery and a minimal Rust `ash` compute shader on the
-local development laptop, followed by numerical equivalence checks
-before GPU performance comparisons. See `commands.md` for exact runs.
+choosing one universally optimal variant. Subsequent Vulkan device discovery,
+GPU gates, prepared circuits, and timestamp-based benchmarks are now
+implemented. See `docs/gpu_benchmark.md` and `commands.md` for current runs.
 
 ## Engineering roadmap
 
@@ -951,19 +954,19 @@ Bathe Exercise 11.1, fixed-angle Aer/QPU comparisons, physical-pair
 calibration, and Bell-state verification. See `docs/09_bathe_vqe_qpu.md`
 for hardware job IDs and the limits of the conclusions.
 
-Phase 2 uses the local Rust state-vector simulator. An exploratory
-single-threaded CPU gate baseline, profiling, and an alternative Hadamard
-kernel are complete. Both CPU implementations remain available as references;
-the next milestone is implementing and benchmarking Vulkan compute kernels
-with `ash`. Detailed milestones and acceptance criteria are in
-`docs/phase_2_simulator_plan.md`. Return to QPU hardware only for a
-specific, testable research question; it is not a Phase 2 dependency.
+Phase 2 is validated on the development machine: CPU baselines, alternative
+Hadamard traversal, Vulkan compute gates, reusable GPU-resident circuits,
+Bathe VQE numerical checks, and timestamp-enabled multi-gate benchmarking.
+`docs/phase_2_simulator_plan.md` remains a historical planning document;
+current implementation and benchmark details are in `docs/gpu_implementation.md`
+and `docs/gpu_benchmark.md`. The next milestone is the final cross-platform
+scientific comparison. New QPU submissions are not required.
 
 A classical eigensolver and a quantum eigensolver are different algorithms;
 solving a FEM eigenproblem does not imply a quantum speedup. General
 state-vector simulation requires `2^n` complex amplitudes, and GPU
-acceleration does not remove that memory cost. GPU work is planned for
-the local development machine, not the Jetson, Slurm, or WebGPU stack.
+acceleration does not remove that memory cost. GPU experiments were run on the local WSL2 laptop, not the Jetson, Slurm,
+or WebGPU stack.
 
 ## Linear algebra reference
 
@@ -1009,6 +1012,10 @@ quantum_compute_lab/
     09_bathe_vqe_qpu.md
     bathe_exercise_11_1.md
     phase_2_simulator_plan.md
+    final_comparison_plan.md
+    gpu_implementation.md
+    gpu_prepared_circuit_benchmark.md
+    gpu_benchmark.md
     quantum_linear_algebra_reference.tex
   experiments/
     01_first_qubit/          main.py
@@ -1020,11 +1027,13 @@ quantum_compute_lab/
     07_interacting_vqe/      main.py, verify_isa_local.py
     08_bathe_vqe_aer/        main.py
     09_bathe_vqe_qpu/        main.py, calibrate.py, diagnose.py, bell_state.py
-  results/                  historical JSON and local CPU benchmark CSVs
+  results/                  historical JSON (local CPU benchmark CSVs ignored)
   rust/
     quantum_core/src/       lib.rs, tests/
     quantum_cpu/src/        main.rs, algorithms, numerical solvers, tests/
     quantum_cpu/src/bin/    statevector_bench.rs
+    quantum_gpu/src/        Vulkan context, buffers, compute, executables
+    quantum_gpu/shaders/    WGSL sources and SPIR-V binaries
     Cargo.toml
   result_writer.py
   README.md
@@ -1033,8 +1042,8 @@ quantum_compute_lab/
 ```
 
 `experiments/` contains executable Python examples; `results/` contains
-recorded measurements and local results. The Rust crates provide the CPU
-reference for Phase 2. `commands.md` is the runnable command reference.
+recorded measurements and local results. The Rust crates provide the CPU reference and Vulkan GPU implementation
+for Phase 2. `commands.md` is the runnable command reference.
 
 The `08_bathe_vqe_step2.md` and `08_bathe_vqe_step3.md` names are retained
 as historical experiment notes rather than renamed, so existing references
@@ -1052,8 +1061,22 @@ The `quantum_gpu` Rust crate uses `ash 0.38` for direct Vulkan compute on the WS
 - Vulkan instance, logical device, command pool, and command buffer successfully created.
 - Empty command buffer submitted and completed successfully.
 - First WGSL shader (`transform.wgsl`) compiled and validated using Naga.
-- All 91 existing Rust tests pass; strict Clippy passes.
+- All 92 Rust tests pass; strict Clippy passes.
 
-The initial compute shader implements `y[i] = 2 * x[i] + 1` using a storage buffer of `f32` values. Its SPIR-V binary has been generated successfully, but **GPU execution and numerical correctness have not yet been tested**.
+The initial `transform.wgsl` smoke test executes and verifies
+`y[i] = 2 * x[i] + 1`. Hadamard, Ry, and CNOT shaders are also implemented
+and exercised. `PreparedCircuit` records multiple gate dispatches with
+compute barriers and reuses pipelines and GPU-resident state across a circuit.
+The Bathe optimized-angle energy agrees with the CPU reference:
+CPU `f64` = **0.724456493728**, GPU `f32` ≈ **0.7244564897**
+(absolute difference ≈ **4.071e-9**).
 
-Next: implement Vulkan storage buffers, memory allocation, descriptor sets, compute pipeline, dispatch, and CPU-side result validation.
+A 12-gate benchmark (10, 15, and 20 qubits; 3 warmups and 9 samples)
+reports CPU execution, GPU device timestamps when supported, submission/wait,
+readback, and end-to-end timings separately. Across three 20-qubit runs,
+CPU `f64` medians were **8.904–9.612 ms**, GPU device medians
+**3.436–3.603 ms**, and GPU end-to-end medians **5.979–6.477 ms**
+(excluding one-time setup). Maximum amplitude error was **6.575e-8**.
+These results apply to this circuit and WSL2/Dozen stack, not native Vulkan
+or quantum hardware; CPU and GPU use different precision. See
+`docs/gpu_benchmark.md` for interpretation.
