@@ -2,6 +2,9 @@
 name = "quantum_gpu"
 version = "0.1.0"
 edition = "2024"
+default-run = "quantum_gpu"
 
 [dependencies]
 ash = "0.38.0"
+quantum_core = { path = "../quantum_core" }
+quantum_cpu = { path = "../quantum_cpu" }

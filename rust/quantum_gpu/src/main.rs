@@ -1,11 +1,7 @@
-mod buffer;
-mod compute;
-mod context;
-
 use ash::vk;
-use buffer::StorageBuffer;
-use compute::{run_hadamard, run_transform};
-use context::{ComputeDevice, VulkanContext};
+use quantum_gpu::buffer::StorageBuffer;
+use quantum_gpu::compute::{run_hadamard, run_transform};
+use quantum_gpu::context::{ComputeDevice, VulkanContext};
 use std::error::Error;
 use std::ffi::CStr;
 

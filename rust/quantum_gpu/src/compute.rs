@@ -85,7 +85,7 @@ impl<'a> ComputePipeline<'a> {
             [vk::DescriptorBufferInfo::default()
                 .buffer(storage.buffer())
                 .offset(0)
-                .range(8)]
+                .range(storage.size())]
         });
         let mut writes = vec![
             vk::WriteDescriptorSet::default()
@@ -296,4 +296,91 @@ pub fn run_hadamard(
         Some(&params),
     )?;
     dispatch_compute(compute, &pipeline, pairs)
+}
+
+/// Apply Ry(theta) to one qubit of an interleaved f32 complex state vector.
+pub fn run_ry(
+    compute: &ComputeDevice<'_>,
+    instance: &ash::Instance,
+    physical_device: vk::PhysicalDevice,
+    storage: &StorageBuffer<'_>,
+    amplitude_count: usize,
+    target: u32,
+    theta: f32,
+) -> Result<(), Box<dyn Error>> {
+    validate_gate_state(storage, amplitude_count, target)?;
+    if !theta.is_finite() {
+        return Err("Ry angle must be finite".into());
+    }
+    let count = u32::try_from(amplitude_count)?;
+    let params = StorageBuffer::new_with_usage(
+        instance,
+        physical_device,
+        compute.device(),
+        16,
+        vk::BufferUsageFlags::UNIFORM_BUFFER,
+    )?;
+    let half = theta * 0.5;
+    params.write_u32(&[target, count, half.cos().to_bits(), half.sin().to_bits()])?;
+    let pipeline = ComputePipeline::new(
+        compute.device(),
+        storage.buffer(),
+        (amplitude_count * 8) as u64,
+        "ry.spv",
+        Some(&params),
+    )?;
+    dispatch_compute(compute, &pipeline, amplitude_count / 2)
+}
+
+/// Apply controlled NOT using distinct control and target qubits.
+pub fn run_cnot(
+    compute: &ComputeDevice<'_>,
+    instance: &ash::Instance,
+    physical_device: vk::PhysicalDevice,
+    storage: &StorageBuffer<'_>,
+    amplitude_count: usize,
+    control: u32,
+    target: u32,
+) -> Result<(), Box<dyn Error>> {
+    validate_gate_state(storage, amplitude_count, target)?;
+    if control >= amplitude_count.trailing_zeros() || control == target {
+        return Err("CNOT control qubit is invalid or equals target".into());
+    }
+    let count = u32::try_from(amplitude_count)?;
+    let params = StorageBuffer::new_with_usage(
+        instance,
+        physical_device,
+        compute.device(),
+        16,
+        vk::BufferUsageFlags::UNIFORM_BUFFER,
+    )?;
+    params.write_u32(&[control, target, count, 0])?;
+    let pipeline = ComputePipeline::new(
+        compute.device(),
+        storage.buffer(),
+        (amplitude_count * 8) as u64,
+        "cnot.spv",
+        Some(&params),
+    )?;
+    dispatch_compute(compute, &pipeline, amplitude_count / 2)
+}
+
+fn validate_gate_state(
+    storage: &StorageBuffer<'_>,
+    amplitude_count: usize,
+    target: u32,
+) -> Result<(), Box<dyn Error>> {
+    if amplitude_count < 2 || !amplitude_count.is_power_of_two() {
+        return Err("amplitude count must be a power of two and at least 2".into());
+    }
+    if target >= amplitude_count.trailing_zeros() {
+        return Err("target qubit is out of range".into());
+    }
+    let bytes = amplitude_count
+        .checked_mul(8)
+        .ok_or("state vector size overflow")?;
+    if bytes as u64 > storage.size() {
+        return Err("state vector exceeds storage buffer size".into());
+    }
+    Ok(())
 }
