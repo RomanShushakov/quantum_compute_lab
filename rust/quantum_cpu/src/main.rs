@@ -1,15 +1,11 @@
 // external imports
 use rand::{SeedableRng, rngs::StdRng};
 
-// mods
-mod bathe_hamiltonian;
-mod bathe_iteration;
-mod bathe_vqe;
-mod bernstein_vazirani;
-mod jacobi;
-mod vqe;
-mod vqe_interacting;
-mod vqe_two_qubit;
+// Reuse the library modules instead of compiling them again in this binary.
+use quantum_cpu::{
+    bathe_hamiltonian, bathe_iteration, bathe_vqe, bernstein_vazirani, jacobi, vqe,
+    vqe_interacting, vqe_two_qubit,
+};
 
 // internal imports
 use quantum_core::StateVector;

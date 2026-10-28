@@ -2,6 +2,7 @@
 name = "quantum_cpu"
 version = "0.1.0"
 edition = "2024"
+default-run = "quantum_cpu"
 
 [dependencies]
 quantum_core = { path = "../quantum_core" }
