@@ -384,3 +384,305 @@ fn validate_gate_state(
     }
     Ok(())
 }
+
+/// A gate in a circuit prepared once and submitted repeatedly.
+/// Parameters and pipelines are immutable for the lifetime of the circuit.
+#[derive(Clone, Copy, Debug)]
+pub enum CircuitGate {
+    Hadamard { target: u32 },
+    Ry { target: u32, theta: f32 },
+    Cnot { control: u32, target: u32 },
+}
+
+/// Prepared GPU circuit. The state buffer, uniforms, descriptors, pipelines,
+/// and recorded command buffer are reused across submissions. All gates act
+/// on the same GPU-resident state, without intermediate host readback.
+///
+/// This uses queue_wait_idle per execution; timing is submission-to-completion,
+/// not GPU timestamp/kernel-only time.
+pub struct PreparedCircuit<'a> {
+    compute: &'a ComputeDevice<'a>,
+    command_buffer: vk::CommandBuffer,
+    // Vulkan objects must remain alive until after the command buffer finishes.
+    _uniforms: Vec<StorageBuffer<'a>>,
+    _pipelines: Vec<ComputePipeline<'a>>,
+    timestamp_pool: vk::QueryPool,
+    timestamp_period_ns: f64,
+    timestamp_valid_bits: u32,
+}
+
+impl<'a> PreparedCircuit<'a> {
+    pub fn new(
+        compute: &'a ComputeDevice<'a>,
+        instance: &ash::Instance,
+        physical_device: vk::PhysicalDevice,
+        storage: &StorageBuffer<'a>,
+        amplitude_count: usize,
+        gates: &[CircuitGate],
+    ) -> Result<Self, Box<dyn Error>> {
+        Self::new_internal(
+            compute,
+            instance,
+            physical_device,
+            storage,
+            amplitude_count,
+            gates,
+            false,
+        )
+    }
+
+    /// Request GPU timestamps when supported by the selected compute queue.
+    /// Falls back to an untimed circuit if the queue exposes no timestamp bits.
+    pub fn new_timed(
+        compute: &'a ComputeDevice<'a>,
+        instance: &ash::Instance,
+        physical_device: vk::PhysicalDevice,
+        storage: &StorageBuffer<'a>,
+        amplitude_count: usize,
+        gates: &[CircuitGate],
+        queue_family_index: u32,
+    ) -> Result<Self, Box<dyn Error>> {
+        let queue_families =
+            unsafe { instance.get_physical_device_queue_family_properties(physical_device) };
+        let family = queue_families
+            .get(queue_family_index as usize)
+            .ok_or("invalid queue family index")?;
+        let timestamp_bits = family.timestamp_valid_bits;
+        let mut circuit = Self::new_internal(
+            compute,
+            instance,
+            physical_device,
+            storage,
+            amplitude_count,
+            gates,
+            timestamp_bits > 0,
+        )?;
+        circuit.timestamp_valid_bits = timestamp_bits;
+        circuit.timestamp_period_ns =
+            unsafe { instance.get_physical_device_properties(physical_device) }
+                .limits
+                .timestamp_period as f64;
+        Ok(circuit)
+    }
+
+    fn new_internal(
+        compute: &'a ComputeDevice<'a>,
+        instance: &ash::Instance,
+        physical_device: vk::PhysicalDevice,
+        storage: &StorageBuffer<'a>,
+        amplitude_count: usize,
+        gates: &[CircuitGate],
+        timestamps: bool,
+    ) -> Result<Self, Box<dyn Error>> {
+        if gates.is_empty() {
+            return Err("prepared circuit requires at least one gate".into());
+        }
+        validate_gate_state(storage, amplitude_count, 0)?;
+        let count = u32::try_from(amplitude_count)?;
+        let bytes = amplitude_count
+            .checked_mul(8)
+            .ok_or("state vector size overflow")? as u64;
+        let mut uniforms = Vec::with_capacity(gates.len());
+        let mut pipelines = Vec::with_capacity(gates.len());
+        for &gate in gates {
+            let (shader, params) = match gate {
+                CircuitGate::Hadamard { target } => {
+                    validate_gate_state(storage, amplitude_count, target)?;
+                    ("hadamard.spv", vec![target, count])
+                }
+                CircuitGate::Ry { target, theta } => {
+                    validate_gate_state(storage, amplitude_count, target)?;
+                    if !theta.is_finite() {
+                        return Err("Ry angle must be finite".into());
+                    }
+                    let half = theta * 0.5;
+                    (
+                        "ry.spv",
+                        vec![target, count, half.cos().to_bits(), half.sin().to_bits()],
+                    )
+                }
+                CircuitGate::Cnot { control, target } => {
+                    validate_gate_state(storage, amplitude_count, target)?;
+                    if control >= amplitude_count.trailing_zeros() || control == target {
+                        return Err("invalid CNOT control/target".into());
+                    }
+                    ("cnot.spv", vec![control, target, count, 0])
+                }
+            };
+            let uniform = StorageBuffer::new_with_usage(
+                instance,
+                physical_device,
+                compute.device(),
+                (params.len() * 4) as u64,
+                vk::BufferUsageFlags::UNIFORM_BUFFER,
+            )?;
+            uniform.write_u32(&params)?;
+            let pipeline = ComputePipeline::new(
+                compute.device(),
+                storage.buffer(),
+                bytes,
+                shader,
+                Some(&uniform),
+            )?;
+            uniforms.push(uniform);
+            pipelines.push(pipeline);
+        }
+        let device = compute.device();
+        let timestamp_pool = if timestamps {
+            let info = vk::QueryPoolCreateInfo::default()
+                .query_type(vk::QueryType::TIMESTAMP)
+                .query_count(2);
+            unsafe { device.create_query_pool(&info, None)? }
+        } else {
+            vk::QueryPool::null()
+        };
+        let allocation = vk::CommandBufferAllocateInfo::default()
+            .command_pool(compute.command_pool())
+            .level(vk::CommandBufferLevel::PRIMARY)
+            .command_buffer_count(1);
+        let command_buffer = unsafe { device.allocate_command_buffers(&allocation)? }[0];
+        let record_result = (|| -> Result<(), Box<dyn Error>> {
+            unsafe {
+                device
+                    .begin_command_buffer(command_buffer, &vk::CommandBufferBeginInfo::default())?;
+                if timestamp_pool != vk::QueryPool::null() {
+                    device.cmd_reset_query_pool(command_buffer, timestamp_pool, 0, 2);
+                    device.cmd_write_timestamp(
+                        command_buffer,
+                        vk::PipelineStageFlags::COMPUTE_SHADER,
+                        timestamp_pool,
+                        0,
+                    );
+                }
+                for (index, pipeline) in pipelines.iter().enumerate() {
+                    if index != 0 {
+                        // Ensure the previous shader writes are visible to the next gate.
+                        let barrier = [vk::MemoryBarrier::default()
+                            .src_access_mask(vk::AccessFlags::SHADER_WRITE)
+                            .dst_access_mask(
+                                vk::AccessFlags::SHADER_READ | vk::AccessFlags::SHADER_WRITE,
+                            )];
+                        device.cmd_pipeline_barrier(
+                            command_buffer,
+                            vk::PipelineStageFlags::COMPUTE_SHADER,
+                            vk::PipelineStageFlags::COMPUTE_SHADER,
+                            vk::DependencyFlags::empty(),
+                            &barrier,
+                            &[],
+                            &[],
+                        );
+                    }
+                    device.cmd_bind_pipeline(
+                        command_buffer,
+                        vk::PipelineBindPoint::COMPUTE,
+                        pipeline.pipeline,
+                    );
+                    device.cmd_bind_descriptor_sets(
+                        command_buffer,
+                        vk::PipelineBindPoint::COMPUTE,
+                        pipeline.pipeline_layout,
+                        0,
+                        &[pipeline.descriptor_set],
+                        &[],
+                    );
+                    device.cmd_dispatch(
+                        command_buffer,
+                        u32::try_from((amplitude_count / 2).div_ceil(64))?,
+                        1,
+                        1,
+                    );
+                }
+                if timestamp_pool != vk::QueryPool::null() {
+                    device.cmd_write_timestamp(
+                        command_buffer,
+                        vk::PipelineStageFlags::COMPUTE_SHADER,
+                        timestamp_pool,
+                        1,
+                    );
+                }
+                let barrier = [vk::MemoryBarrier::default()
+                    .src_access_mask(vk::AccessFlags::SHADER_WRITE)
+                    .dst_access_mask(vk::AccessFlags::HOST_READ)];
+                device.cmd_pipeline_barrier(
+                    command_buffer,
+                    vk::PipelineStageFlags::COMPUTE_SHADER,
+                    vk::PipelineStageFlags::HOST,
+                    vk::DependencyFlags::empty(),
+                    &barrier,
+                    &[],
+                    &[],
+                );
+                device.end_command_buffer(command_buffer)?;
+            }
+            Ok(())
+        })();
+        if let Err(error) = record_result {
+            unsafe {
+                device.free_command_buffers(compute.command_pool(), &[command_buffer]);
+                if timestamp_pool != vk::QueryPool::null() {
+                    device.destroy_query_pool(timestamp_pool, None);
+                }
+            }
+            return Err(error);
+        }
+        Ok(Self {
+            compute,
+            command_buffer,
+            _uniforms: uniforms,
+            _pipelines: pipelines,
+            timestamp_pool,
+            timestamp_period_ns: 0.0,
+            timestamp_valid_bits: 0,
+        })
+    }
+
+    /// Returns None when timestamps are unsupported; otherwise elapsed GPU time
+    /// in microseconds. The query brackets dispatches and shader barriers only.
+    pub fn gpu_elapsed_us(&self) -> Result<Option<f64>, Box<dyn Error>> {
+        if self.timestamp_pool == vk::QueryPool::null() {
+            return Ok(None);
+        }
+        let mut ticks = [0_u64; 2];
+        unsafe {
+            self.compute.device().get_query_pool_results(
+                self.timestamp_pool,
+                0,
+                &mut ticks,
+                vk::QueryResultFlags::TYPE_64 | vk::QueryResultFlags::WAIT,
+            )?;
+        }
+        let mask = if self.timestamp_valid_bits == 64 {
+            u64::MAX
+        } else {
+            (1_u64 << self.timestamp_valid_bits) - 1
+        };
+        let elapsed_ticks = ticks[1].wrapping_sub(ticks[0]) & mask;
+        Ok(Some(
+            elapsed_ticks as f64 * self.timestamp_period_ns / 1_000.0,
+        ))
+    }
+
+    pub fn execute(&self) -> Result<(), Box<dyn Error>> {
+        let device = self.compute.device();
+        let buffers = [self.command_buffer];
+        let submits = [vk::SubmitInfo::default().command_buffers(&buffers)];
+        unsafe {
+            device.queue_submit(self.compute.queue(), &submits, vk::Fence::null())?;
+            device.queue_wait_idle(self.compute.queue())?;
+        }
+        Ok(())
+    }
+}
+
+impl Drop for PreparedCircuit<'_> {
+    fn drop(&mut self) {
+        let device = self.compute.device();
+        let _ = unsafe { device.device_wait_idle() };
+        unsafe {
+            device.free_command_buffers(self.compute.command_pool(), &[self.command_buffer]);
+            if self.timestamp_pool != vk::QueryPool::null() {
+                device.destroy_query_pool(self.timestamp_pool, None);
+            }
+        }
+    }
+}

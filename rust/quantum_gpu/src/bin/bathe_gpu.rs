@@ -3,7 +3,7 @@ use ash::vk;
 use quantum_core::StateVector;
 use quantum_cpu::{bathe_hamiltonian, bathe_vqe};
 use quantum_gpu::buffer::StorageBuffer;
-use quantum_gpu::compute::{run_cnot, run_hadamard, run_ry};
+use quantum_gpu::compute::{CircuitGate, PreparedCircuit};
 use quantum_gpu::context::{ComputeDevice, VulkanContext};
 use std::{error::Error, time::Instant};
 
@@ -15,11 +15,30 @@ fn gpu_state(
     angles: [f64; 3],
 ) -> Result<Vec<f32>, Box<dyn Error>> {
     storage.write_f32(&[1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])?;
-    run_ry(compute, instance, physical, storage, 4, 1, angles[0] as f32)?;
-    run_ry(compute, instance, physical, storage, 4, 0, angles[1] as f32)?;
-    run_cnot(compute, instance, physical, storage, 4, 1, 0)?;
-    run_ry(compute, instance, physical, storage, 4, 0, angles[2] as f32)?;
-    run_cnot(compute, instance, physical, storage, 4, 1, 0)?;
+    let gates = [
+        CircuitGate::Ry {
+            target: 1,
+            theta: angles[0] as f32,
+        },
+        CircuitGate::Ry {
+            target: 0,
+            theta: angles[1] as f32,
+        },
+        CircuitGate::Cnot {
+            control: 1,
+            target: 0,
+        },
+        CircuitGate::Ry {
+            target: 0,
+            theta: angles[2] as f32,
+        },
+        CircuitGate::Cnot {
+            control: 1,
+            target: 0,
+        },
+    ];
+    let circuit = PreparedCircuit::new(compute, instance, physical, storage, 4, &gates)?;
+    circuit.execute()?;
     storage.read_f32(8)
 }
 
@@ -87,7 +106,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     println!("GPU Bathe VQE comparison verified");
     println!(
-        "Exploratory Hadamard timing: includes pipeline creation, queue synchronization and host-visible memory; not GPU-only kernel time."
+        "Prepared Hadamard benchmark: setup is separate; GPU time includes queue submission and wait, not GPU-only kernel time."
     );
     for qubits in [10u32, 15, 20] {
         let count = 1usize << qubits;
@@ -96,9 +115,23 @@ fn main() -> Result<(), Box<dyn Error>> {
         initial[0] = 1.0;
         data.write_f32(&initial)?;
         let iterations = if qubits == 20 { 12 } else { 30 };
+        let setup_start = Instant::now();
+        let circuit = PreparedCircuit::new(
+            &compute,
+            instance,
+            physical,
+            &data,
+            count,
+            &[CircuitGate::Hadamard { target: 0 }],
+        )?;
+        let setup_us = setup_start.elapsed().as_secs_f64() * 1e6;
+        // Warm up without measuring pipeline creation or first submission.
+        for _ in 0..5 {
+            circuit.execute()?;
+        }
         let start = Instant::now();
         for _ in 0..iterations {
-            run_hadamard(&compute, instance, physical, &data, count, 0)?;
+            circuit.execute()?;
         }
         let gpu_us = start.elapsed().as_secs_f64() * 1e6 / iterations as f64;
         let mut cpu = StateVector::zero(qubits as usize);
@@ -107,7 +140,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             cpu.hadamard(0);
         }
         let cpu_us = start.elapsed().as_secs_f64() * 1e6 / iterations as f64;
-        println!("qubits={qubits}, CPU_f64_us={cpu_us:.3}, GPU_f32_end_to_end_us={gpu_us:.3}");
+        let read_start = Instant::now();
+        let _readback = data.read_f32(count * 2)?;
+        let readback_us = read_start.elapsed().as_secs_f64() * 1e6;
+        println!(
+            "qubits={qubits}, CPU_f64_us={cpu_us:.3}, GPU_f32_submit_wait_us={gpu_us:.3}, GPU_setup_us={setup_us:.3}, GPU_readback_us={readback_us:.3}"
+        );
     }
     Ok(())
 }
