@@ -3,7 +3,7 @@
 struct Parameters {
     target_qubit: u32,
     amplitude_count: u32,
-};
+}
 
 @group(0) @binding(0)
 var<storage, read_write> amplitudes: array<vec2<f32>>;
@@ -15,7 +15,7 @@ var<uniform> params: Parameters;
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let pair = global_id.x;
     let pair_count = params.amplitude_count / 2u;
-    if (pair >= pair_count) {
+    if pair >= pair_count {
         return;
     }
 
@@ -26,7 +26,8 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
     let a = amplitudes[low];
     let b = amplitudes[high];
-    let inv_sqrt_2 = 0.7071067811865476;
+    let inv_sqrt_2 = inverseSqrt(2.0);
+
     amplitudes[low] = (a + b) * inv_sqrt_2;
     amplitudes[high] = (a - b) * inv_sqrt_2;
 }

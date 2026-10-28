@@ -1,16 +1,18 @@
-# Python
+# Python environments and caches
 venv/
 __pycache__/
 
-# Rust
+# Rust build outputs
 /rust/target/
 /rust/target_native/
+
+# Rust workspace lockfile policy: currently not tracked
 /rust/Cargo.lock
 
-# CPU benchmarks
+# Generated CPU benchmark measurements (historical QPU JSON remains tracked)
 /results/phase_2_cpu/
 
-# Linux perf profiling
+# Linux perf profiling outputs
 perf.data
 perf.data.*
 perf_*.data
