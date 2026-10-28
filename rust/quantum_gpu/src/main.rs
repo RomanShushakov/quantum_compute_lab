@@ -1,99 +1,81 @@
-use ash::{Entry, vk};
+mod buffer;
+mod compute;
+mod context;
+
+use ash::vk;
+use buffer::StorageBuffer;
+use compute::run_transform;
+use context::{ComputeDevice, VulkanContext};
 use std::error::Error;
-use std::ffi::{CStr, CString};
+use std::ffi::CStr;
 
 fn verify_compute_device(
     instance: &ash::Instance,
     physical_device: vk::PhysicalDevice,
     queue_family_index: u32,
 ) -> Result<(), Box<dyn Error>> {
-    let priorities = [1.0_f32];
-
-    let queue_info = [vk::DeviceQueueCreateInfo::default()
-        .queue_family_index(queue_family_index)
-        .queue_priorities(&priorities)];
-
-    // Enable 64-bit floating-point arithmetic for future shaders.
-    let features = vk::PhysicalDeviceFeatures::default().shader_float64(true);
-
-    let device_info = vk::DeviceCreateInfo::default()
-        .queue_create_infos(&queue_info)
-        .enabled_features(&features);
-
-    let device = unsafe { instance.create_device(physical_device, &device_info, None)? };
-
-    let queue = unsafe { device.get_device_queue(queue_family_index, 0) };
-
+    let compute = ComputeDevice::new(instance, physical_device, queue_family_index)?;
     println!("  Logical device created");
-    println!("  Compute queue handle: {queue:?}");
+    println!("  Compute queue handle: {:?}", compute.queue());
 
-    let command_pool_info = vk::CommandPoolCreateInfo::default()
-        .queue_family_index(queue_family_index)
-        .flags(vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER);
+    let input = [1.0_f32, 2.0, 3.0, 4.0];
+    let storage = StorageBuffer::new(
+        instance,
+        physical_device,
+        compute.device(),
+        std::mem::size_of_val(&input) as vk::DeviceSize,
+    )?;
+    storage.write_f32(&input)?;
+    let output = storage.read_f32(input.len())?;
 
-    let command_pool = unsafe { device.create_command_pool(&command_pool_info, None)? };
+    println!(
+        "  Storage buffer memory type: {}",
+        storage.memory_type_index()
+    );
+    println!("  Storage buffer input: {input:?}");
+    println!("  Storage buffer readback: {output:?}");
+    assert_eq!(output, input);
+    println!("  Storage buffer allocation and mapping verified");
 
-    let allocate_info = vk::CommandBufferAllocateInfo::default()
-        .command_pool(command_pool)
-        .level(vk::CommandBufferLevel::PRIMARY)
-        .command_buffer_count(1);
-
-    let command_buffers = unsafe { device.allocate_command_buffers(&allocate_info)? };
-
-    let command_buffer = command_buffers[0];
-
-    let begin_info =
-        vk::CommandBufferBeginInfo::default().flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
-
-    unsafe {
-        device.begin_command_buffer(command_buffer, &begin_info)?;
-        device.end_command_buffer(command_buffer)?;
-    }
-
-    let submit_buffers = [command_buffer];
-    let submit_info = [vk::SubmitInfo::default().command_buffers(&submit_buffers)];
-
-    unsafe {
-        device.queue_submit(queue, &submit_info, vk::Fence::null())?;
-        device.queue_wait_idle(queue)?;
-    }
-
+    compute.submit_empty()?;
     println!("  Empty compute command buffer submitted successfully");
 
-    unsafe {
-        device.destroy_command_pool(command_pool, None);
-        device.destroy_device(None);
-    }
-
+    storage.write_f32(&input)?;
+    run_transform(&compute, &storage, input.len())?;
+    let gpu_output = storage.read_f32(input.len())?;
+    let expected = [3.0_f32, 5.0, 7.0, 9.0];
+    println!("  GPU transform output: {gpu_output:?}");
+    assert_eq!(gpu_output, expected);
+    println!("  GPU compute dispatch verified");
     Ok(())
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
-    // Load the Vulkan loader dynamically.
-    let entry = unsafe { Entry::load()? };
+fn inspect_memory(instance: &ash::Instance, physical_device: vk::PhysicalDevice) {
+    let memory_properties =
+        unsafe { instance.get_physical_device_memory_properties(physical_device) };
 
-    let app_name = CString::new("quantum_gpu")?;
-    let engine_name = CString::new("quantum_compute_lab")?;
+    println!("  Vulkan memory types:");
 
-    let app_info = vk::ApplicationInfo::default()
-        .application_name(&app_name)
-        .application_version(vk::make_api_version(0, 0, 1, 0))
-        .engine_name(&engine_name)
-        .engine_version(vk::make_api_version(0, 0, 1, 0))
-        .api_version(vk::API_VERSION_1_2);
+    for index in 0..memory_properties.memory_type_count as usize {
+        let memory_type = memory_properties.memory_types[index];
 
-    let create_info = vk::InstanceCreateInfo::default().application_info(&app_info);
-
-    // Vulkan objects must be explicitly destroyed.
-    let instance = unsafe { entry.create_instance(&create_info, None)? };
-
-    let result = inspect_devices(&instance);
-
-    unsafe {
-        instance.destroy_instance(None);
+        println!(
+            "    Type {index}: heap={}, flags={:?}",
+            memory_type.heap_index, memory_type.property_flags
+        );
     }
 
-    result
+    println!("  Vulkan memory heaps:");
+
+    for index in 0..memory_properties.memory_heap_count as usize {
+        let heap = memory_properties.memory_heaps[index];
+
+        println!(
+            "    Heap {index}: size={} MiB, flags={:?}",
+            heap.size / (1024 * 1024),
+            heap.flags
+        );
+    }
 }
 
 fn inspect_devices(instance: &ash::Instance) -> Result<(), Box<dyn Error>> {
@@ -119,6 +101,8 @@ fn inspect_devices(instance: &ash::Instance) -> Result<(), Box<dyn Error>> {
             vk::api_version_patch(properties.api_version)
         );
         println!("  shaderFloat64: {}", features.shader_float64 == vk::TRUE);
+
+        inspect_memory(instance, *device);
 
         for (family_index, family) in queue_families.iter().enumerate() {
             let compute = family.queue_flags.contains(vk::QueueFlags::COMPUTE);
@@ -160,4 +144,9 @@ fn inspect_devices(instance: &ash::Instance) -> Result<(), Box<dyn Error>> {
     }
 
     Ok(())
+}
+
+fn main() -> Result<(), Box<dyn Error>> {
+    let context = VulkanContext::new()?;
+    inspect_devices(context.instance())
 }
