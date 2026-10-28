@@ -1039,3 +1039,21 @@ reference for Phase 2. `commands.md` is the runnable command reference.
 The `08_bathe_vqe_step2.md` and `08_bathe_vqe_step3.md` names are retained
 as historical experiment notes rather than renamed, so existing references
 and experiment numbering remain stable.
+
+### Vulkan GPU backend — initialization and shader compilation
+
+The `quantum_gpu` Rust crate uses `ash 0.38` for direct Vulkan compute on the WSL2 laptop. GPU shaders are authored in WGSL and compiled to SPIR-V using Naga CLI 30.0.1.
+
+**Verified capabilities and milestones:**
+
+- Vulkan 1.2.354 via Mesa Dozen / Direct3D12 on AMD Radeon integrated graphics.
+- Compute-only queue family 1 selected (8 queues available).
+- `shaderFloat64` supported and enabled on the logical device.
+- Vulkan instance, logical device, command pool, and command buffer successfully created.
+- Empty command buffer submitted and completed successfully.
+- First WGSL shader (`transform.wgsl`) compiled and validated using Naga.
+- All 91 existing Rust tests pass; strict Clippy passes.
+
+The initial compute shader implements `y[i] = 2 * x[i] + 1` using a storage buffer of `f32` values. Its SPIR-V binary has been generated successfully, but **GPU execution and numerical correctness have not yet been tested**.
+
+Next: implement Vulkan storage buffers, memory allocation, descriptor sets, compute pipeline, dispatch, and CPU-side result validation.

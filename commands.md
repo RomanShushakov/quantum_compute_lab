@@ -686,3 +686,39 @@ rm -f /tmp/hadamard_assembly.txt
 The CPU comparison is complete as an exploratory exercise. Next:
 Rust `ash` Vulkan device/compute-queue discovery and a minimal compute
 shader on the local laptop. No Vulkan performance results exist yet.
+
+
+## Phase 2 — Vulkan GPU backend
+
+### Build and validate the WGSL shader
+
+```bash
+cd ~/workdir/quantum_compute_lab/rust
+
+naga \
+  quantum_gpu/shaders/transform.wgsl \
+  quantum_gpu/shaders/transform.spv
+
+naga quantum_gpu/shaders/transform.wgsl
+
+file quantum_gpu/shaders/transform.spv
+```
+
+### Verify Vulkan initialization
+
+```bash
+cargo fmt --all -- --check
+cargo run -p quantum_gpu
+cargo test --workspace
+cargo clippy --workspace --all-targets -- -D warnings
+```
+
+Expected results:
+
+- Physical GPU detected through Mesa Dozen.
+- Compute queue family 1 selected.
+- Logical device created with shaderFloat64 enabled.
+- Empty command buffer submitted successfully.
+- 91 Rust tests passing.
+
+Note: SPIR-V is generated locally and excluded from Git.
