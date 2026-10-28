@@ -2,7 +2,7 @@
 
 A personal learning and engineering project exploring quantum algorithms, numerical linear algebra, IBM quantum hardware, and CPU/GPU state-vector simulation.
 
-The goal was to understand the mathematics and the implementation details through small, reproducible experiments—not to demonstrate quantum advantage.
+The goal was to understand the mathematics and the implementation details through small, reproducible experiments - not to demonstrate quantum advantage.
 
 ## What is included
 
@@ -20,9 +20,9 @@ The project progressed from simple Qiskit circuits to a small Rust quantum simul
 
 The Rust workspace contains three crates:
 
-- **`quantum_core`** — statevector representation, quantum gates and measurements.
-- **`quantum_cpu`** — quantum algorithms, VQE, numerical reference solvers and CPU benchmarks.
-- **`quantum_gpu`** — Vulkan device management, buffers, compute pipelines, reusable circuits and GPU benchmarks.
+- **`quantum_core`** - statevector representation, quantum gates and measurements.
+- **`quantum_cpu`** - quantum algorithms, VQE, numerical reference solvers and CPU benchmarks.
+- **`quantum_gpu`** - Vulkan device management, buffers, compute pipelines, reusable circuits and GPU benchmarks.
 
 The GPU backend uses Vulkan directly, rather than a higher-level GPU framework.
 
